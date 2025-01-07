@@ -111,16 +111,18 @@ function App() {
 
     useEffect(() => {
         const handleClickOutside = (event) => {
+            // Check if the clicked element is part of the dropdown
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setDropdown(null);
                 setSuggestions([]);
             }
         };
-
+    
+        // Attach the event listener only if the dropdown is open
         if (dropdown || suggestions.length > 0) {
             document.addEventListener("mousedown", handleClickOutside);
         }
-
+    
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
@@ -368,13 +370,15 @@ function App() {
             {showStickyNotes && (
                 <div className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
                     <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
-                        <button
-                            className="absolute top-18 right-12 text-white hover:text-gray-400"
-                            onClick={() => setShowStickyNotes(false)}
-                        >
-                            <i className="fas fa-times"></i>
-                        </button>
-                        <h2 className="text-white text-xl mb-4">Sticky Notes</h2>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-white font-bold text-xl mb-4">Sticky Notes</h2>
+                            <button
+                                className="mr-2 mb-4 text-white hover:text-gray-400"
+                                onClick={() => setShowStickyNotes(false)}
+                            >
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
                         {stickyNotes.length > 0 ? (
                             stickyNotes.map((note, index) => {
                                 const formattedNote = note.split('\n').map((line, i) => (
@@ -414,7 +418,7 @@ function App() {
                         className="fas fa-bars text-white text-2xl mr-4 cursor-pointer" 
                         onClick={toggleSidebar}
                     ></i>
-                    <img src="assets/augur.png" alt="Augur" className="w-8 h-8" />
+                    <img src="assets/augur.png" alt="Augur" className="w-8 h-8"/>
                     <span className="text-white text-2xl">UGUR</span>
                 </div>
                 {/*<div className="justify-right items-center text-right text-white" dangerouslySetInnerHTML={{ __html: dateTime + "<br>" + systemInfo }}></div>*/}
@@ -430,6 +434,7 @@ function App() {
                     <ul>
                             <li className="py-2 hover:underline hover:cursor-pointer" ><i className="fas fa-newspaper mr-2"></i>News</li>
                             <li className="py-2 hover:underline hover:cursor-pointer"><i className="fas fa-calculator mr-3"></i>Calculator</li>
+                            <li className="py-2 hover:underline hover:cursor-pointer"><i className="fas fa-cloud-sun-rain mr-2"></i>Search</li>
                         </ul>
                         <button onClick={toggleSidebar} className="mt-4 bg-red-500 text-white p-2 rounded">Close</button>
                     </div>
@@ -477,13 +482,13 @@ function App() {
                 <div className="flex right-0 justify-center mt-2">
                     <div className="flex space-x-4 items-center">
                     {["folder", "film", "share-alt", "code", "book", "cloud-download-alt"].map((icon, index) => (
-                        <div ref={dropdownRef} key={index} className="relative">
+                        <div key={index} className="relative">
                             <i 
                                 className={`fas fa-${icon} hover:text-white text-blue-500 text-2xl cursor-pointer`} 
                                 onClick={() => toggleDropdown(icon)}
                             ></i>
                             {dropdown === icon && (
-                                <div className={`absolute w-32 top-8 overflow-x-hidden bg-gray-800 text-white p-2 rounded shadow-lg ${["folder", "film", "share-alt"].includes(icon) ? "left-0" : "right-0"}`}>               <ul>
+                                <div ref={dropdownRef} className={`absolute w-32 top-8 overflow-x-hidden bg-gray-800 text-white p-2 rounded shadow-lg ${["folder", "film", "share-alt"].includes(icon) ? "left-0" : "right-0"}`}>               <ul>
                                         {customLinks[icon].map((link, i) => (
                                             <li key={i} className=" mb-1">
                                                 <a href={link.url} target="_blank" className="hover:underline">{link.title}</a>
@@ -509,13 +514,12 @@ function App() {
                     ></i>
                 </div>
                 <div className="flex items-center space-x-4">
-                <button 
-                    className="text-white px-4 py-2 rounded"
-                    onClick={() => document.getElementById('settings').classList.toggle('hidden')}
-                >
-                    <i className="fas fa-cog text-white text-2xl"></i>
-                </button>
-        
+                    <button 
+                        className="text-white px-4 py-2 rounded"
+                        onClick={() => document.getElementById('settings').classList.toggle('hidden')}
+                    >
+                        <i className="fas fa-cog text-white text-2xl "></i>
+                    </button>
                 </div>
             </div>
             {/*<div id="news" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
@@ -538,14 +542,16 @@ function App() {
                 </div>
             </div>*/}
             <div id="settings" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
-                <button
-                    className="absolute top-16 right-24 text-white hover:text-gray-400"
-                    onClick={() => document.getElementById('settings').classList.add('hidden')}
-                >
-                    <i className="fas fa-times"></i>
-                </button>
                 <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
-                    <h2 className="text-white text-xl mb-4">Settings <i className="fas fa-info-circle text-white" onClick={() => document.getElementById('about').classList.toggle('hidden')}></i></h2> 
+                    <div className="flex justify-between items-center mb-4">
+                        <h1 className="text-white font-bold text-xl mb-4">Settings <i className="fas fa-info-circle text-white" onClick={() => document.getElementById('about').classList.toggle('hidden')}></i></h1> 
+                        <button
+                            className="text-white mr-2 mb-4 hover:text-gray-400"
+                            onClick={() => document.getElementById('settings').classList.add('hidden')}
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </div>
                     <p className="text-white text-m font-bold mb-2">Search Engine</p>
                     <select
                         className="bg-gray-700 text-center text-white px-4 py-2 rounded w-full"
@@ -640,20 +646,22 @@ function App() {
             </div>
             <div id="about" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
                 <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
-                <h1 className="text-3xl font-bold">About</h1>
-                <p className="text-lg">Welcome to Augur.</p>
-                <p className="text-lg">Augur is a sweet and simple startpage with many features and customizations.</p>
-                <div className="flex flex-col space-y-2 mt-4">
-                    <a href="https://github.com/9-5/Augur" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><i className="fab fa-github mr-2"></i> GitHub Repo</a>
-                    <a href="https://ż.co/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><i className="fas fa-code mr-2"></i>ż.co</a>
-                    <a href="https://johnle.org/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><i className="fas fa-user mr-2"></i> Developer Site</a>
-                </div>
-                <button
-                        className="absolute top-16 right-24 text-white hover:text-gray-400" 
-                        onClick={() => document.getElementById('about').classList.add('hidden')}
-                    >
-                        <i className="fas fa-times"></i>
-                    </button>
+                    <div className="flex justify-between items-center mb-4">
+                        <h1 className="text-3xl font-bold">About</h1>
+                        <button
+                            className="mr-2 mb-4 text-white hover:text-gray-400" 
+                            onClick={() => document.getElementById('about').classList.add('hidden')}
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <p className="text-lg">Welcome to Augur.</p>
+                    <p className="text-lg">Augur is a sweet and simple startpage with many features and customizations.</p>
+                    <div className="flex flex-col space-y-2 mt-4">
+                        <a href="https://ż.co/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><i className="fas fa-code mr-2"></i>ż.co</a>
+                        <a href="https://github.com/9-5/Augur" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><i className="fab fa-github mr-2"></i> GitHub Repo</a>
+                        <a href="https://johnle.org/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><i className="fas fa-user mr-2"></i> Developer Site</a>
+                    </div>
                 </div>
             </div>
         </div>
