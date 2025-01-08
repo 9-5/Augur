@@ -81,7 +81,7 @@ function App() {
     const [activeStickyNote, setActiveStickyNote] = useState(null);
     const [showAddNotePopup, setShowAddNotePopup] = useState(false);
     const [weatherData, setWeatherData] = useState(null);
-    const [weatherLocation, setWeatherLocation] = useState('New York, NY'); // add to lcl storage
+    const [weatherLocation, setWeatherLocation] = useState('New York, NY');
     const [weatherDataFetched, setWeatherDataFetched] = useState(false);
 
 
@@ -336,7 +336,6 @@ function App() {
         );
     };
 
-
     const handleAddStickyNote = () => {
         setShowAddNotePopup(true);
     };
@@ -369,6 +368,7 @@ function App() {
     };
 
     const renderWeather = () => {
+        
         useEffect(() => {
             if (!weatherDataFetched) {
               const storedLocation = localStorage.getItem('weatherLocation');
@@ -377,26 +377,81 @@ function App() {
                 setWeatherDataFetched(true);
               }
             }
-          }, []);
+        }, []);
+
+        const renderHourlyTemperatureTable = () => {
+            if (!weatherData || !weatherData.hourly || !weatherData.hourly.data) {
+                return <p>No hourly temperature data available.</p>;
+            }
+        
+            const currentTime = new Date();
+            const currentHour = currentTime.getHours();
+            const startIndex = weatherData.hourly.data.findIndex((hour) => {
+                const date = new Date(hour.time * 1000);
+                return date.getHours() === currentHour;
+            });
+            const start = startIndex >= 0 ? startIndex : 0;
+        
+            return (
+                <div className="overflow-x-auto overflow-y-auto h-full w-full sm:h-64 sm:w-full md:h-full md:w-full">
+                    <table className="min-w-full rounded bg-gray-800 text-white border border-gray-700 sm:text-sm md:text-md">
+                        <thead className="sticky top-0 bg-gray-800">
+                            <tr>
+                                <th className="font-bold text-center text-white px-4 py-2 border border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">Date and Time</th>
+                                <th className="font-bold text-center text-white px-4 py-2 border border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">Temperature (°C/°F)</th>
+                                <th className="font-bold text-center text-white px-4 py-2 border border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">Precipitation Type</th>
+                                <th className="font-bold text-center text-white px-4 py-2 border border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">Precipitation Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {weatherData.hourly.data.slice(start).map((hour, index) => {
+                                const date = new Date(hour.time * 1000);
+                                const dateString = date.toLocaleDateString([], { weekday: 'short', year: '2-digit', month: '2-digit', day: '2-digit' });
+                                const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                const dateTimeString = `${dateString} ${timeString}`;
+                                
+                                const temperatureCelsius = hour.temperature;
+                                const temperatureFahrenheit = (temperatureCelsius * 9/5) + 32;
+                                
+                                const precipTyope = hour.precipType || 'N/A';
+                                const precipAcc = hour.precipAccumulation || 0;
+
+                                return (
+                                    <tr key={index} className="hover:bg-gray-700">
+                                        <td className="px-4 py-2 border text-white text-center border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">{dateTimeString}</td>
+                                        <td className="px-4 py-2 border text-white text-center border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">{temperatureCelsius}°C / {temperatureFahrenheit.toFixed(2)}°F</td>
+                                        <td className="px-4 py-2 border text-white text-center border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">{precipTyope}</td>
+                                        <td className="px-4 py-2 border text-white text-center border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">{precipAcc}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        };
+
+        const location = weatherData ? weatherData.merry.location.name : 'Loading...';
+        
         return (
-            <div>
-                <h1>Weather Information</h1>
+            <div className="bg-gray-600 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
+                <div className="flex justify-between mb-4">
+                    <h1 className="text-2xl font-bold">Weather</h1>
+                    <button
+                        className="text-white mr-2 mb-2 hover:text-gray-400"
+                        onClick={() => document.getElementById('weather').classList.add('hidden')}
+                    >
+                        <i className="fas fa-times"></i>
+                    </button>
+                </div>
                 {weatherData ? (
                     <div>
-                        <p>Location: {weatherData.merry.location.name}</p>
-                        <p>Temperature: {weatherData.hourly.data[0].temperature}°C</p>
-                        <p>Summary: {weatherData.currently.summary}</p>
+                        <p className="text-lg font-bold mb-2">{location}</p>
+                        {renderHourlyTemperatureTable()}
                     </div>
                  ) : (
                     <p>Loading weather data...</p>
                 )}
-                
-                <h2>Search Suggestions</h2>
-                <ul>
-                    {suggestions.map((suggestion, index) => (
-                        <li key={index}>{suggestion}</li>
-                    ))}
-                </ul>
             </div>
         );
     };
@@ -553,7 +608,7 @@ function App() {
                     </div>
                 </div>
             </div>
-            <div className="absolute bottom-0 left-0 right-0 flex justify-between items-center p-4 bg-black ">
+            <div className="absolute bottom-0 left-0 right-0 flex justify-between items-center p-4 bg-black">
                 <div className="flex items-center space-x-4">
                     <i 
                         className="fas fa-clipboard text-white text-2xl cursor-pointer" 
@@ -642,20 +697,12 @@ function App() {
                             value={weatherLocation}
                             onChange={handleLocationChange}
                         />
-                        <p className="text-white font-bold">Scale</p>
-                        <select className="bg-gray-700 text-white px-4 py-2 rounded w-full"  onChange={(e) => setUnit(e.target.value)}>
-                            <option value="fahrenheit">°F</option>
-                            <option value="celsius">°C</option>
-                        </select>
                     </div>
+
                     <div className="flex items-center space-x-4 mt-4">
-                    
-                    </div>
-                    <div className="flex items-center space-x-4 mt-4">
-                        
-                    <p className="text-white text-lg font-bold">Custom Links</p>
-                    <button className="text-white rounded" onClick={() => document.getElementById('linkSettings').classList.toggle('hidden')}>
-                        <i className="fas fa-chevron-down mr-8"></i>
+                        <p className="text-white text-lg font-bold">Custom Links</p>
+                        <button className="text-white rounded" onClick={() => document.getElementById('linkSettings').classList.toggle('hidden')}>
+                            <i className="fas fa-chevron-down mr-8"></i>
                         </button>
                     </div>
                     <div id="linkSettings" className="hidden">
