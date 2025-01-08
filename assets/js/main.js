@@ -80,6 +80,9 @@ function App() {
     const [showStickyNotes, setShowStickyNotes] = useState(false);
     const [activeStickyNote, setActiveStickyNote] = useState(null);
     const [showAddNotePopup, setShowAddNotePopup] = useState(false);
+    const [weatherData, setWeatherData] = useState(null);
+    const [weatherLocation, setWeatherLocation] = useState('New York, NY'); // add to lcl storage
+    const [weatherDataFetched, setWeatherDataFetched] = useState(false);
 
 
 
@@ -89,7 +92,11 @@ function App() {
             if (event.data.error) {
                 console.error(`Worker error: ${event.data.error}`);
             } else {
-                setSuggestions(event.data.suggestions);
+                if (event.data.mode === 'search') {
+                    setSuggestions(event.data.data);
+                } else if (event.data.mode === 'weather') {
+                    setWeatherData(event.data.data);
+                }
             }
         };
         return () => {
@@ -97,6 +104,12 @@ function App() {
             console.log('Web worker terminated');
         };
     }, []);
+
+    
+
+    const fetchWeatherData = (location) => {
+        spiderRef.current.postMessage({ mode: 'weather', query: location });
+    };
 
     useEffect(() => {
         localStorage.setItem('customLinks', JSON.stringify(customLinks));
@@ -111,14 +124,12 @@ function App() {
 
     useEffect(() => {
         const handleClickOutside = (event) => {
-            // Check if the clicked element is part of the dropdown
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setDropdown(null);
                 setSuggestions([]);
             }
         };
     
-        // Attach the event listener only if the dropdown is open
         if (dropdown || suggestions.length > 0) {
             document.addEventListener("mousedown", handleClickOutside);
         }
@@ -130,7 +141,7 @@ function App() {
 
     useEffect(() => {
         if (query.length > 2) {
-            spiderRef.current.postMessage({ query });
+            spiderRef.current.postMessage({ mode: 'search', query });
         } else {
             setSuggestions([]);
         }
@@ -203,6 +214,13 @@ function App() {
 
     const handleThemeChange = (theme) => {
         setCurrentTheme(theme.className);
+    };
+
+    const handleLocationChange = (event) => {
+        const location = event.target.value;
+        setWeatherLocation(location);
+        localStorage.setItem('weatherLocation', location);
+        fetchWeatherData(location);
     };
 
     const toggleDropdown = (icon) => {
@@ -350,6 +368,39 @@ function App() {
         localStorage.setItem('stickyNotes', JSON.stringify(updatedNotes));
     };
 
+    const renderWeather = () => {
+        useEffect(() => {
+            if (!weatherDataFetched) {
+              const storedLocation = localStorage.getItem('weatherLocation');
+              if (storedLocation) {
+                fetchWeatherData(storedLocation);
+                setWeatherDataFetched(true);
+              }
+            }
+          }, []);
+        return (
+            <div>
+                <h1>Weather Information</h1>
+                {weatherData ? (
+                    <div>
+                        <p>Location: {weatherData.merry.location.name}</p>
+                        <p>Temperature: {weatherData.hourly.data[0].temperature}°C</p>
+                        <p>Summary: {weatherData.currently.summary}</p>
+                    </div>
+                 ) : (
+                    <p>Loading weather data...</p>
+                )}
+                
+                <h2>Search Suggestions</h2>
+                <ul>
+                    {suggestions.map((suggestion, index) => (
+                        <li key={index}>{suggestion}</li>
+                    ))}
+                </ul>
+            </div>
+        );
+    };
+
     return (
         <div className="absolute w-full h-full bg-black">
             {showAddNotePopup && (
@@ -431,10 +482,10 @@ function App() {
                             <img src="assets/augur.png" alt="Augur" className="w-8 h-8" />
                             <span className="text-white text-2xl">UGUR</span>       
                         </div>
-                    <ul>
+                        <ul>
                             <li className="py-2 hover:underline hover:cursor-pointer" ><i className="fas fa-newspaper mr-2"></i>News</li>
                             <li className="py-2 hover:underline hover:cursor-pointer"><i className="fas fa-calculator mr-3"></i>Calculator</li>
-                            <li className="py-2 hover:underline hover:cursor-pointer"><i className="fas fa-cloud-sun-rain mr-2"></i>Search</li>
+                            <li className="py-2 hover:underline hover:cursor-pointer" onClick={() => document.getElementById('weather').classList.toggle('hidden')}><i className="fas fa-cloud-sun-rain mr-2"></i>Weather</li>
                         </ul>
                         <button onClick={toggleSidebar} className="mt-4 bg-red-500 text-white p-2 rounded">Close</button>
                     </div>
@@ -541,6 +592,10 @@ function App() {
                     </div>
                 </div>
             </div>*/}
+            <div id="weather" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
+                {console.log("Weather data:", weatherData)}
+                {renderWeather()}
+            </div>
             <div id="settings" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
                 <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
@@ -552,7 +607,7 @@ function App() {
                             <i className="fas fa-times"></i>
                         </button>
                     </div>
-                    <p className="text-white text-m font-bold mb-2">Search Engine</p>
+                    <p className="text-white text-lg font-bold mb-2">Search Engine</p>
                     <select
                         className="bg-gray-700 text-center text-white px-4 py-2 rounded w-full"
                         value={defaultEngine[2]}
@@ -567,7 +622,7 @@ function App() {
                             </option>
                         ))}
                     </select>
-                    <p className="text-white text-m font-bold mt-4">Theme</p>
+                    <p className="text-white text-lg font-bold mt-4">Theme</p>
                     <select
                         className="bg-gray-700 text-center text-white px-4 py-2 rounded w-full"
                         value={currentTheme}
@@ -577,65 +632,92 @@ function App() {
                             <option key={theme.name} value={theme.className}>{theme.name}</option>
                         ))}
                     </select>
-                    <p className="text-white text-m font-bold mt-4">Custom Links</p>
-                    {Object.keys(customLinks).map((icon) => (
-                        <div key={icon} className="mb-4">
-                            <h2 className="text-white text-xl font-semibold"><i className={`fas fa-${icon} mr-2`}></i></h2>
-                            {customLinks[icon].map((link, index) => (
-                                <div key={index} className="flex items-center space-x-2 mb-2">
-                                    <input
-                                        type="text"
-                                        value={link.title}
-                                        onChange={(e) => {
-                                            const updatedLinks = { ...customLinks };
-                                            updatedLinks[icon][index].title = e.target.value;
-                                            setCustomLinks(updatedLinks);
-                                        }}
-                                        className="bg-gray-700 text-white px-2 py-1 rounded w-full sm:py-2"
-                                    />
-                                    <input
-                                        type="text"
-                                        value={link.url}
-                                        onChange={(e) => {
-                                            const updatedLinks = { ...customLinks };
-                                            updatedLinks[icon][index].url = e.target.value;
-                                            setCustomLinks(updatedLinks);
-                                        }}
-                                        className="bg-gray-700 text-white px-2 py-1 rounded w-full sm:py-2"
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            const updatedLinks = { ...customLinks };
-                                            updatedLinks[icon].splice(index, 1);
-                                            setCustomLinks(updatedLinks);
-                                        }}
-                                        className="bg-red-500 text-white px-4 py-2 rounded sm:px-6 sm:py-3"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            ))}
-                            <button
-                                onClick={() => {
-                                    const updatedLinks = { ...customLinks };
-                                    updatedLinks[icon].push({ title: "New Link", url: "https://example.com" });
-                                    setCustomLinks(updatedLinks);
-                                }}
-                                className="bg-green-500 text-white px-4 py-2 rounded w-full sm:py-3"
-                            >
-                                Add Link
-                            </button>
-                        </div>
-                    ))}
-                    <button
-                        onClick={() => {
-                            localStorage.setItem('customLinks', JSON.stringify(customLinks));
-                            alert('Custom links saved successfully!');
-                        }}
-                        className="bg-blue-500 text-white px-4 py-2 rounded w-full sm:py-3 mt-4"
-                    >
-                        Save Custom Links
-                    </button>
+                    <h2 className="text-white text-lg font-bold mt-4">Weather Settings</h2>
+                    <div className="flex items-center space-x-4 mt-4">
+                        <p className="text-white font-bold">Location</p>
+                        <input
+                            type="text"
+                            className="bg-gray-700 text-white px-4 py-2 rounded w-full"
+                            placeholder="City, Region, Country"
+                            value={weatherLocation}
+                            onChange={handleLocationChange}
+                        />
+                        <p className="text-white font-bold">Scale</p>
+                        <select className="bg-gray-700 text-white px-4 py-2 rounded w-full"  onChange={(e) => setUnit(e.target.value)}>
+                            <option value="fahrenheit">°F</option>
+                            <option value="celsius">°C</option>
+                        </select>
+                    </div>
+                    <div className="flex items-center space-x-4 mt-4">
+                    
+                    </div>
+                    <div className="flex items-center space-x-4 mt-4">
+                        
+                    <p className="text-white text-lg font-bold">Custom Links</p>
+                    <button className="text-white rounded" onClick={() => document.getElementById('linkSettings').classList.toggle('hidden')}>
+                        <i className="fas fa-chevron-down mr-8"></i>
+                        </button>
+                    </div>
+                    <div id="linkSettings" className="hidden">
+                        {Object.keys(customLinks).map((icon) => (
+                            <div key={icon} className="mb-4">
+                                <h2 className="text-white text-xl font-semibold"><i className={`fas fa-${icon} mr-2`}></i></h2>
+                                {customLinks[icon].map((link, index) => (
+                                    <div key={index} className="flex items-center space-x-2 mb-2">
+                                        <input
+                                            type="text"
+                                            value={link.title}
+                                            onChange={(e) => {
+                                                const updatedLinks = { ...customLinks };
+                                                updatedLinks[icon][index].title = e.target.value;
+                                                setCustomLinks(updatedLinks);
+                                            }}
+                                            className="bg-gray-700 text-white px-2 py-1 rounded w-full sm:py-2"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={link.url}
+                                            onChange={(e) => {
+                                                const updatedLinks = { ...customLinks };
+                                                updatedLinks[icon][index].url = e.target.value;
+                                                setCustomLinks(updatedLinks);
+                                            }}
+                                            className="bg-gray-700 text-white px-2 py-1 rounded w-full sm:py-2"
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const updatedLinks = { ...customLinks };
+                                                updatedLinks[icon].splice(index, 1);
+                                                setCustomLinks(updatedLinks);
+                                            }}
+                                            className="bg-red-500 text-white px-4 py-2 rounded sm:px-6 sm:py-3"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ))}
+                                <button
+                                    onClick={() => {
+                                        const updatedLinks = { ...customLinks };
+                                        updatedLinks[icon].push({ title: "New Link", url: "https://example.com" });
+                                        setCustomLinks(updatedLinks);
+                                    }}
+                                    className="bg-green-500 text-white px-4 py-2 rounded w-full sm:py-3"
+                                >
+                                    Add Link
+                                </button>
+                            </div>
+                        ))}
+                        <button
+                            onClick={() => {
+                                localStorage.setItem('customLinks', JSON.stringify(customLinks));
+                                alert('Custom links saved successfully!');
+                            }}
+                            className="bg-blue-500 text-white px-4 py-2 rounded w-full sm:py-3 mt-4"
+                        >
+                            Save Custom Links
+                        </button>
+                    </div>
                     <button
                         className="mt-4 bg-red-500 text-white px-4 py-2 rounded w-full"
                         onClick={() => document.getElementById('settings').classList.add('hidden')}

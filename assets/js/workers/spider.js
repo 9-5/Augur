@@ -1,8 +1,15 @@
 self.addEventListener('message', async (event) => {
-    const { query } = event.data;
+    const { mode, query } = event.data;
 
     try {
-        const proxyUrl = `https://cors.ż.co/api/cors?url=https://duckduckgo.com/ac/?q=${query}`;
+        let proxyUrl;
+        if (mode === 'search') {
+            proxyUrl = `https://cors.ż.co/api/cors?url=https://duckduckgo.com/ac/?q=${query}`;
+        } else if (mode === 'weather') {
+            proxyUrl = `https://cors.ż.co/api/cors?url=https://api.merrysky.net/weather?q=${query}&source=pirateweather`;
+        } else {
+            throw new Error('Invalid mode specified');
+        }
 
         const response = await fetch(proxyUrl);
 
@@ -12,9 +19,10 @@ self.addEventListener('message', async (event) => {
 
         const data = await response.json();
 
-        self.postMessage({ suggestions: data });
+        // Send the response back to the main thread
+        self.postMessage({ mode, data });
     } catch (error) {
         console.error(`Error: ${error.message}`);
-        self.postMessage({ error: error.message });
+        self.postMessage({ mode, error: error.message });
     }
 });
