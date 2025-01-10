@@ -55,8 +55,7 @@ const iconLinks = {
 const rssFeeds = [
     "https://feeds.bbci.co.uk/news/rss.xml",
     "https://news.yahoo.com/rss/mostviewed",
-    "https://www.theguardian.com/world/rss",
-    "https://www.washingtonpost.com/rss.xml"
+    "https://www.theguardian.com/world/rss"
     ];
 
 function App() {
@@ -92,7 +91,49 @@ function App() {
     const [weatherLocation, setWeatherLocation] = useState('New York, NY');
     const [weatherDataFetched, setWeatherDataFetched] = useState(false);
     const [news, setNews] = useState([]);
+    const [articleUrl, setArticleUrl] = useState(null);
+    const [showArticlePopup, setShowArticlePopup] = useState(false);
+    const [articleContent, setArticleContent] = useState(null);
 
+    const fetchArticleContent = async (url) => {
+        try {
+            const response = await fetch(`https://cors.ż.co/api/2?url=${url}`);
+            const data = await response.text();
+            console.log(data);
+            setArticleContent(data);
+        } catch (error) {
+            console.error(`Error fetching article content: ${error}`);
+        }
+    };
+      
+    const ArticlePopup = () => {
+        const handleClose = () => {
+            setShowArticlePopup(false);
+            setArticleContent(null);
+        };
+      
+        return (
+            <div className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+                <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-4">
+                        <h1 className="text-white text-xl mb-4">{articleUrl}</h1>
+                        <button
+                            className="text-white mr-2 mb-4 hover:text-gray-400"
+                            onClick={handleClose}
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </div>
+                    {articleContent ? (
+                    <div className="text-white" dangerouslySetInnerHTML={{ __html: articleContent }} />
+                    ) : (
+                    <p>Loading article content...</p>
+                    )}
+                </div>
+            </div>
+        );
+    };
+      
     const processXML = async (xml) => {
         try {
             const parser = new RSSParser();
@@ -119,43 +160,55 @@ function App() {
     
     const renderNews = () => {
         useEffect(() => {
-            const fetchAndProcessNews = async () => {
-                const newsList = [];
-                for (const url of rssFeeds) {
-                    const xml = await fetchNews(url);
-                    const articles = await processXML(xml);
-                    newsList.push(...articles);
-                }
-                setNews(newsList);
-            };
-            fetchAndProcessNews();
+          const fetchAndProcessNews = async () => {
+            const newsList = [];
+            for (const url of rssFeeds) {
+              const xml = await fetchNews(url);
+              const articles = await processXML(xml);
+              newsList.push(...articles);
+            }
+            setNews(newsList);
+          };
+          fetchAndProcessNews();
         }, []);
-    
+      
         return (
-            <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
-                <div className="flex justify-between items-center mb-4">
-                    <h1 className="text-white text-xl mb-4">News</h1>
-                    <button
-                        className="text-white mr-2 mb-4 hover:text-gray-400"
-                        onClick={() => document.getElementById('news').classList.add('hidden')}
-                    >
-                        <i className="fas fa-times"></i>
-                    </button>
-                </div>
-                <div className="flex-grow overflow-y-auto">
-                    <ul>
-                        {news.map((article, index) => (
-                            <li key={index} className="mb-2">
-                                <a href={article.link} target="_blank" className="hover:underline">
-                                    [{article?.link.split('www.')[1]?.split('/')[0] || 'Unknown Publisher'}]- {article.title}
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+          <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h1 className="text-white text-xl mb-4">News</h1>
+              <button
+                className="text-white mr-2 mb-4 hover:text-gray-400"
+                onClick={() => document.getElementById('news').classList.add('hidden')}
+              >
+                <i className="fas fa-times"></i>
+              </button>
             </div>
+            <div className="flex-grow overflow-y-auto">
+              <ul>
+                {news.map((article, index) => (
+                  <li key={index} className="mb-2">
+                    <p
+                      className="hover:underline"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setArticleUrl(article.link);
+                        console.log("1")
+                        setShowArticlePopup(true);
+                        console.log("2")
+                        fetchArticleContent(article.link);
+                        console.log(article.link)
+                      }}
+                    >
+                      [{article?.link.split('.')[1]?.toUpperCase() || 'Unknown Publisher'}] -{' '}
+                      {article.title}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         );
-    };
+      };
 
     useEffect(() => {
         spiderRef.current = new Worker('assets/js/workers/spider.js');
@@ -525,6 +578,7 @@ function App() {
 
     return (
         <div className="absolute w-full h-full bg-black">
+            {showArticlePopup && <ArticlePopup />}
             {showAddNotePopup && (
                 <AddNotePopup
                     onSave={handleSaveStickyNote}
