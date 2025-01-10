@@ -1,5 +1,6 @@
 const { useState, useEffect, useRef } = React;
 const Draggable = ReactDraggable;
+
 const searchEngines = [
     ["g", "https://www.google.com/search?q={Q}", "Google"],
     ["d", "https://duckduckgo.com/?q={Q}", "DuckDuckGo"],
@@ -51,6 +52,13 @@ const iconLinks = {
     ],
 };
 
+const rssFeeds = [
+    "https://feeds.bbci.co.uk/news/rss.xml",
+    "https://news.yahoo.com/rss/mostviewed",
+    "https://www.theguardian.com/world/rss",
+    "https://www.washingtonpost.com/rss.xml"
+    ];
+
 function App() {
     const [defaultEngine, setDefaultEngine] = useState(() => {
         const savedEngine = localStorage.getItem('searchEngine');
@@ -83,8 +91,71 @@ function App() {
     const [weatherData, setWeatherData] = useState(null);
     const [weatherLocation, setWeatherLocation] = useState('New York, NY');
     const [weatherDataFetched, setWeatherDataFetched] = useState(false);
+    const [news, setNews] = useState([]);
 
-
+    const processXML = async (xml) => {
+        try {
+            const parser = new RSSParser();
+            const feed = await parser.parseString(xml);
+            const articles = feed.items.slice(0, 5);
+            return articles;
+        } catch (error) {
+            return [];
+        }
+    };
+    
+    const fetchNews = async (url) => {
+        spiderRef.current.postMessage({ mode: 'news', query: url });
+        return new Promise(resolve => {
+            const handleNewsMessage = (event) => {
+                if (event.data.mode === 'news') {
+                    spiderRef.current.removeEventListener('message', handleNewsMessage);
+                    resolve(event.data.data);
+                }
+            };
+            spiderRef.current.addEventListener('message', handleNewsMessage);
+        });
+    };
+    
+    const renderNews = () => {
+        useEffect(() => {
+            const fetchAndProcessNews = async () => {
+                const newsList = [];
+                for (const url of rssFeeds) {
+                    const xml = await fetchNews(url);
+                    const articles = await processXML(xml);
+                    newsList.push(...articles);
+                }
+                setNews(newsList);
+            };
+            fetchAndProcessNews();
+        }, []);
+    
+        return (
+            <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                    <h1 className="text-white text-xl mb-4">News</h1>
+                    <button
+                        className="text-white mr-2 mb-4 hover:text-gray-400"
+                        onClick={() => document.getElementById('news').classList.add('hidden')}
+                    >
+                        <i className="fas fa-times"></i>
+                    </button>
+                </div>
+                <div className="flex-grow overflow-y-auto">
+                    <ul>
+                        {news.map((article, index) => (
+                            <li key={index} className="mb-2">
+                                <a href={article.link} target="_blank" className="hover:underline">
+                                    [{article?.link.split('www.')[1]?.split('/')[0] || 'Unknown Publisher'}]- {article.title}
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+        );
+    };
 
     useEffect(() => {
         spiderRef.current = new Worker('assets/js/workers/spider.js');
@@ -96,16 +167,12 @@ function App() {
                     setSuggestions(event.data.data);
                 } else if (event.data.mode === 'weather') {
                     setWeatherData(event.data.data);
+                } else if (event.data.mode === 'news') {
+                    processXML(event.data.data)
+                  }
                 }
-            }
-        };
-        return () => {
-            spiderRef.current.terminate();
-            console.log('Web worker terminated');
-        };
-    }, []);
-
-    
+              };
+            }, []);
 
     const fetchWeatherData = (location) => {
         spiderRef.current.postMessage({ mode: 'weather', query: location });
@@ -538,7 +605,7 @@ function App() {
                             <span className="text-white text-2xl">UGUR</span>       
                         </div>
                         <ul>
-                            <li className="py-2 hover:underline hover:cursor-pointer" ><i className="fas fa-newspaper mr-2"></i>News</li>
+                            <li className="py-2 hover:underline hover:cursor-pointer" onClick={() => document.getElementById('news').classList.toggle('hidden')}><i className="fas fa-newspaper mr-2"></i>News</li>
                             <li className="py-2 hover:underline hover:cursor-pointer"><i className="fas fa-calculator mr-3"></i>Calculator</li>
                             <li className="py-2 hover:underline hover:cursor-pointer" onClick={() => document.getElementById('weather').classList.toggle('hidden')}><i className="fas fa-cloud-sun-rain mr-2"></i>Weather</li>
                         </ul>
@@ -628,27 +695,10 @@ function App() {
                     </button>
                 </div>
             </div>
-            {/*<div id="news" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
-                <div className="bg-white p-4 rounded shadow-md w-96 h-96 flex flex-col">
-                    <h2 className="text-black text-xl mb-4">News</h2>
-                    <div className="flex-grow overflow-y-auto">
-                        <ul>
-                            {news.map((item, index) => (
-                                <li key={index} className="mb-2">
-                                    <a href={item.url} target="_blank" className="hover:underline">{item.title}</a>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                    <div className="flex justify-end">
-                        <button className="text-black px-4 py-2 rounded" onClick={() => document.getElementById('news').classList.add('hidden')}>
-                            Close
-                        </button>
-                    </div>
-                </div>
-            </div>*/}
+            <div id="news" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
+                {renderNews()}
+            </div>
             <div id="weather" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
-                {console.log("Weather data:", weatherData)}
                 {renderWeather()}
             </div>
             <div id="settings" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">

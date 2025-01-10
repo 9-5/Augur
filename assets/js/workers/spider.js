@@ -2,6 +2,7 @@ self.addEventListener('message', async (event) => {
     const { mode, query } = event.data;
     const CORZ = 'https://cors.ż.co/api/cors?url=';
     try {
+        console.log(`[${mode}] ${query}`);
         let proxyUrl;
         if (mode === 'search') {
             proxyUrl = `${CORZ}https://duckduckgo.com/ac/?q=${query}`;
@@ -16,10 +17,15 @@ self.addEventListener('message', async (event) => {
         const response = await fetch(proxyUrl);
 
         if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
+            throw new Error(`HTTP error! Status: ${response.status}\n${await response.text()}\n${proxyUrl}`);
         }
 
-        const data = await response.json();
+        let data;
+        if (mode === 'news') {
+            data = await response.text();
+        } else {
+            data = await response.json();
+        }
 
         // Send the response back to the main thread
         self.postMessage({ mode, data });
