@@ -116,7 +116,6 @@ function App() {
             <div className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
                 <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
-                        <h1 className="text-white text-xl mb-4">{articleUrl}</h1>
                         <button
                             className="text-white mr-2 mb-4 hover:text-gray-400"
                             onClick={handleClose}
@@ -192,11 +191,8 @@ function App() {
                       onClick={(e) => {
                         e.preventDefault();
                         setArticleUrl(article.link);
-                        console.log("1")
                         setShowArticlePopup(true);
-                        console.log("2")
                         fetchArticleContent(article.link);
-                        console.log(article.link)
                       }}
                     >
                       [{article?.link.split('.')[1]?.toUpperCase() || 'Unknown Publisher'}] -{' '}
