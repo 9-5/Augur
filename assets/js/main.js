@@ -117,7 +117,7 @@ function App() {
             <div className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
                 <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
-                        <a href={articleUrl} className="text-white font-bold text-lg">Original Article</a>
+                        <a href={articleUrl} className="text-white font-bold text-lg break-words md:break-normal overflow-scroll">{articleTitle}</a>
                         <button
                             className="text-white mr-2 mb-4 hover:text-gray-400"
                             onClick={handleClose}
@@ -192,6 +192,7 @@ function App() {
                       className="hover:underline"
                       onClick={(e) => {
                         e.preventDefault();
+                        setArticleTitle(article.title);
                         setArticleUrl(article.link);
                         setShowArticlePopup(true);
                         fetchArticleContent(article.link);
