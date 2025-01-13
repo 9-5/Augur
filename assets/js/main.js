@@ -174,9 +174,9 @@ function App() {
         }
         
         return (
-            <div className="flex flex-col items-center overflow-x-hidden mt-4">
-                <h2 className="align-left text-white text-2xl font-bold">News</h2>
-                <div className="overflow-x-auto overflow-y-hidden ml-4 h-full w-full sm:h-64 sm:w-full md:h-full md:w-full">
+            <div className="flex flex-col  overflow-x-hidden mt-2">
+                <h2 className="align-left text-white text-2xl font-bold ml-4">News</h2>
+                <div className="overflow-x-auto overflow-y-hidden items-center ml-4 h-full w-full sm:h-64 sm:w-full md:h-full md:w-full">
                     <div className="news-grid flex flex-nowrap">
                     {news.map((article, index) => (
                         <div key={index} className="news-item bg-gray-800 p-4 rounded shadow-lg2">
@@ -779,7 +779,7 @@ function App() {
             </div>
             {(enableNews || enableWeather) ? (
                 <>
-                    <div className= "mt-48">
+                    <div className= "mt-40">
                         {enableNews && (
                             renderNews()
                         )}
