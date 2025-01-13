@@ -26,6 +26,78 @@ th, td {
     padding: 10px;
     text-align: left;
 }
+.news-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-gap: 10px;
+}
+.news-item {
+    display: flex;
+    width: fit-content;
+    justify-content: space-between;
+}
+.news-item h3 {
+    font-size: 18px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    line-clamp: 7;
+    -webkit-line-clamp: 7;
+
+    -webkit-box-orient: vertical;
+}
+.news-item p {
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+.weather-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-gap: 10px;
+}
+.weather-item {
+    background-color: #333;
+    padding: 20px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 150px;
+}
+.weather-item h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+.weather-item p {
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+.toggle-switch {
+    width: 37.5px;
+    height: 18px;
+    background-color: #ccc;
+    border-radius: 50px;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.toggle-thumb {
+    width: 16px;
+    height: 16px;
+    background-color: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 1px;
+    left: -1px;
+    transition: transform 0.2s;
+}
+.toggle-thumb.on {
+    transform: translateX(26px);
+}
+
+.toggle-switch.on {
+    background-color: #4caf50;
+}
 @media only screen and (max-width: 768px) {
     table {
         width: 100%;

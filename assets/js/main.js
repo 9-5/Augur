@@ -59,6 +59,7 @@ const rssFeeds = [
     ];
 
 function App() {
+    const [isSetup, setIsSetup] = useState(() => localStorage.getItem('isSetup') === 'true');
     const [defaultEngine, setDefaultEngine] = useState(() => {
         const savedEngine = localStorage.getItem('searchEngine');
         return savedEngine ? JSON.parse(savedEngine) : searchEngines[0];
@@ -71,10 +72,9 @@ function App() {
     const [dropdown, setDropdown] = useState(null);
     const [dateTime, setDateTime] = useState("");
     const [systemInfo, setSystemInfo] = useState("");
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const sidebarRef = useRef(null);
     const [suggestions, setSuggestions] = useState([]);
     const spiderRef = useRef(null);
+    const [spiderRefInitialized, setSpiderRefInitialized] = useState(false);
     const dropdownRef = useRef(null);
     const [customLinks, setCustomLinks] = useState(() => {
         const savedLinks = localStorage.getItem('customLinks');
@@ -88,19 +88,19 @@ function App() {
     const [activeStickyNote, setActiveStickyNote] = useState(null);
     const [showAddNotePopup, setShowAddNotePopup] = useState(false);
     const [weatherData, setWeatherData] = useState(null);
-    const [weatherLocation, setWeatherLocation] = useState('New York, NY');
-    const [weatherDataFetched, setWeatherDataFetched] = useState(false);
+    const [weatherLocation, setWeatherLocation] = useState(() => localStorage.getItem('weatherLocation') || 'Warsaw');
     const [news, setNews] = useState([]);
     const [articleUrl, setArticleUrl] = useState(null);
     const [showArticlePopup, setShowArticlePopup] = useState(false);
     const [articleContent, setArticleContent] = useState(null);
     const [articleTitle, setArticleTitle] = useState(null);
-
+    const [enableNews, setEnableNews] = useState(() => JSON.parse(localStorage.getItem('enableNews')) || false);
+    const [enableWeather, setEnableWeather] = useState(() => JSON.parse(localStorage.getItem('enableWeather')) || false);
+    
     const fetchArticleContent = async (url) => {
         try {
             const response = await fetch(`https://cors.ż.co/api/2?url=${url}`);
             const data = await response.text();
-            console.log(data);
             setArticleContent(data);
         } catch (error) {
             console.error(`Error fetching article content: ${error}`);
@@ -158,56 +158,47 @@ function App() {
             spiderRef.current.addEventListener('message', handleNewsMessage);
         });
     };
-    
+    const fetchAndProcessNews = async () => {
+        const newsList = [];
+        for (const url of rssFeeds) {
+            const xml = await fetchNews(url);
+            const articles = await processXML(xml);
+            newsList.push(...articles);
+        }
+        setNews(newsList);
+    };
+
     const renderNews = () => {
-        useEffect(() => {
-          const fetchAndProcessNews = async () => {
-            const newsList = [];
-            for (const url of rssFeeds) {
-              const xml = await fetchNews(url);
-              const articles = await processXML(xml);
-              newsList.push(...articles);
-            }
-            setNews(newsList);
-          };
-          fetchAndProcessNews();
-        }, []);
-      
+        if (news.length === 0) {
+            fetchAndProcessNews();
+        }
+        
         return (
-          <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h1 className="text-white text-xl mb-4">News</h1>
-              <button
-                className="text-white mr-2 mb-4 hover:text-gray-400"
-                onClick={() => document.getElementById('news').classList.add('hidden')}
-              >
-                <i className="fas fa-times"></i>
-              </button>
+            <div className="flex flex-col items-center overflow-x-hidden mt-4">
+                <h2 className="align-left text-white text-2xl font-bold">News</h2>
+                <div className="overflow-x-auto overflow-y-hidden ml-4 h-full w-full sm:h-64 sm:w-full md:h-full md:w-full">
+                    <div className="news-grid flex flex-nowrap">
+                    {news.map((article, index) => (
+                        <div key={index} className="news-item bg-gray-800 p-4 rounded shadow-lg2">
+                            <h3 
+                                className="text-white text-md font-bold hover:underline hover:cursor-pointer break-words md:break-normal overflow-scroll"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setArticleTitle(article.title);
+                                    setArticleUrl(article.link);
+                                    setShowArticlePopup(true);
+                                    fetchArticleContent(article.link);
+                                }}
+                            >
+                                {article.title}
+                            </h3>
+                        </div>
+                    ))}
+                    </div>
+                </div>
             </div>
-            <div className="flex-grow overflow-y-auto">
-              <ul>
-                {news.map((article, index) => (
-                  <li key={index} className="mb-2">
-                    <p
-                      className="hover:underline"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setArticleTitle(article.title);
-                        setArticleUrl(article.link);
-                        setShowArticlePopup(true);
-                        fetchArticleContent(article.link);
-                      }}
-                    >
-                      [{article?.link.split('.')[1]?.toUpperCase() || 'Unknown Publisher'}] -{' '}
-                      {article.title}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        );
-      };
+        )
+    };
 
     useEffect(() => {
         spiderRef.current = new Worker('assets/js/workers/spider.js');
@@ -224,10 +215,15 @@ function App() {
                   }
                 }
               };
+            setSpiderRefInitialized(true);
             }, []);
-
+    
     const fetchWeatherData = (location) => {
-        spiderRef.current.postMessage({ mode: 'weather', query: location });
+        if (spiderRefInitialized) {
+            spiderRef.current.postMessage({ mode: 'weather', query: location });
+        } else {
+            console.log();
+        }
     };
 
     useEffect(() => {
@@ -266,23 +262,6 @@ function App() {
         }
     }, [query]);
 
-
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
-                setIsSidebarOpen(false);
-            }
-        };
-
-        if (isSidebarOpen) {
-            document.addEventListener("mousedown", handleClickOutside);
-        }
-
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
-    }, [isSidebarOpen]);
-
     useEffect(() => {
         buildSystemInfo();
     }, []);
@@ -296,6 +275,13 @@ function App() {
         localStorage.setItem('theme', currentTheme);
     }, [currentTheme]);
 
+    useEffect(() => {
+        localStorage.setItem('enableNews', JSON.stringify(enableNews));
+    }, [enableNews]);
+
+    useEffect(() => {
+        localStorage.setItem('enableWeather', JSON.stringify(enableWeather));
+    }, [enableWeather]);
 
     const buildSystemInfo = () => {
         const pixelRatio = window.devicePixelRatio;
@@ -346,16 +332,11 @@ function App() {
         setDropdown(dropdown === icon ? null : icon);
     };
 
-    const toggleSidebar = () => {
-        setIsSidebarOpen(!isSidebarOpen);
-    };
-
     const StickyNote = ({ note, onClose, onSave }) => {
         const [editedNote, setEditedNote] = useState(note);
         const [isEdited, setIsEdited] = useState(false);
     
         const handleInput = (e) => {
-            console.log('Editing on..')
             const newText = e.target.innerText;
             setEditedNote(newText);
             setIsEdited(newText !== note);
@@ -487,18 +468,12 @@ function App() {
     };
 
     const renderWeather = () => {
-        
-        useEffect(() => {
-            if (!weatherDataFetched) {
-              const storedLocation = localStorage.getItem('weatherLocation');
-              if (storedLocation) {
-                fetchWeatherData(storedLocation);
-                setWeatherDataFetched(true);
-              }
-            }
-        }, []);
+        if (!weatherData) {
+            fetchWeatherData(weatherLocation);
+            return <p>Loading weather data...</p>;
+        }
 
-        const renderHourlyTemperatureTable = () => {
+        const renderWeatherWidget = () => {
             if (!weatherData || !weatherData.hourly || !weatherData.hourly.data) {
                 return <p>No hourly temperature data available.</p>;
             }
@@ -512,71 +487,165 @@ function App() {
             const start = startIndex >= 0 ? startIndex : 0;
         
             return (
-                <div className="overflow-x-auto overflow-y-auto h-full w-full sm:h-64 sm:w-full md:h-full md:w-full">
-                    <table className="min-w-full rounded bg-gray-800 text-white border border-gray-700 sm:text-sm md:text-md">
-                        <thead className="sticky top-0 bg-gray-800">
-                            <tr>
-                                <th className="font-bold text-center text-white px-4 py-2 border border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">Date and Time</th>
-                                <th className="font-bold text-center text-white px-4 py-2 border border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">Temperature (°C/°F)</th>
-                                <th className="font-bold text-center text-white px-4 py-2 border border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">Precipitation Type</th>
-                                <th className="font-bold text-center text-white px-4 py-2 border border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">Precipitation Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {weatherData.hourly.data.slice(start).map((hour, index) => {
-                                const date = new Date(hour.time * 1000);
-                                const dateString = date.toLocaleDateString([], { weekday: 'short', year: '2-digit', month: '2-digit', day: '2-digit' });
-                                const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                const dateTimeString = `${dateString} ${timeString}`;
-                                
-                                const temperatureCelsius = hour.temperature;
-                                const temperatureFahrenheit = (temperatureCelsius * 9/5) + 32;
-                                
-                                const precipTyope = hour.precipType || 'N/A';
-                                const precipAcc = hour.precipAccumulation || 0;
-
-                                return (
-                                    <tr key={index} className="hover:bg-gray-700">
-                                        <td className="px-4 py-2 border text-white text-center border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">{dateTimeString}</td>
-                                        <td className="px-4 py-2 border text-white text-center border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">{temperatureCelsius}°C / {temperatureFahrenheit.toFixed(2)}°F</td>
-                                        <td className="px-4 py-2 border text-white text-center border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">{precipTyope}</td>
-                                        <td className="px-4 py-2 border text-white text-center border-gray-700 sm:px-2 sm:py-1 md:px-4 md:py-2">{precipAcc}</td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                <>             
+                    <div className="flex flex-col overflow-x-hidden mt-4">
+                        <h2 className="text-white text-2xl font-bold ml-4">Weather</h2>
+                        <p className="text-white text-lg ml-4">{location}</p>
+                        <div className="overflow-x-auto items-center overflow-y-hidden h-full w-full sm:h-64 sm:w-full md:h-full md:w-full">
+                            <div className="weather-grid flex flex-nowrap">
+                                {weatherData && weatherData.hourly && weatherData.hourly.data.slice(start).map((hour, index) => {
+                                    const date = new Date(hour.time * 1000);
+                                    const dateString = date.toLocaleDateString([], { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' });
+                                    const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                    const dateTimeString = `${dateString} ${timeString}`;
+                                    
+                                    const temperatureCelsius = hour.temperature;
+                                    const temperatureFahrenheit = (temperatureCelsius * 9/5) + 32;
+                                    
+                                    const precipType = hour.precipType || 'N/A';
+                                    const precipAcc = hour.precipAccumulation || 0;
+                                    return (
+                                        <div key={index} className="weather-item flex flex-row ml-4 bg-gray-800 p-4 rounded shadow-lg">
+                                            <h3 className="text-white text-lg font-bold text-center">{dateTimeString}</h3>
+                                            <div id="temperature" className="ml-4 flex flex-col">
+                                                <p className="text-white text-sm ml-3">🌡️</p>
+                                                <p className="text-white text-sm">{temperatureFahrenheit.toFixed(2)}°F</p>
+                                                <p className="text-white text-sm">{temperatureCelsius}°C</p>
+                                            </div>
+                                            <div className="ml-4">
+                                                <p className="text-white text-sm ml-1">🌦️</p>
+                                                <p className="text-white text-sm">{precipType}</p>
+                                            </div>
+                                            <div className="ml-4">
+                                                <p className="text-white text-sm ml-1">💧</p>
+                                                <p className="text-white text-sm">{precipAcc.toFixed(2)} mm</p>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </>
             );
         };
-
         const location = weatherData ? weatherData.merry.location.name : 'Loading...';
+
+        return (
+            renderWeatherWidget()
+        );
+    };
+
+    const SetupPopup = () => {
+        const [defaultEngine, setDefaultEngine] = useState(searchEngines[0]);
+        const [currentTheme, setCurrentTheme] = useState(themes[0]);
+        const [enableNews, setEnableNews] = useState(false);
+        const [enableWeather, setEnableWeather] = useState(false);
+        const [weatherLocation, setWeatherLocation] = useState('');
+        
+        const handleSaveSetup = () => {
+            localStorage.setItem('searchEngine', JSON.stringify(defaultEngine));
+            
+            localStorage.setItem('theme', currentTheme.className);
+            localStorage.setItem('enableNews', JSON.stringify(enableNews));
+            localStorage.setItem('enableWeather', JSON.stringify(enableWeather));
+            if (enableWeather) {
+            localStorage.setItem('weatherLocation', weatherLocation);
+            }
+            localStorage.setItem('isSetup', JSON.stringify(true));
+            setIsSetup(true);
+        };
         
         return (
-            <div className="bg-gray-600 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
-                <div className="flex justify-between mb-4">
-                    <h1 className="text-2xl font-bold">Weather</h1>
-                    <button
-                        className="text-white mr-2 mb-2 hover:text-gray-400"
-                        onClick={() => document.getElementById('weather').classList.add('hidden')}
+            <div className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+                <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-4">
+                        <h1 className="text-white font-bold text-xl mb-4">Setup</h1>
+                        <button
+                            className="text-white mr-2 mb-4 hover:text-gray-400"
+                            onClick={() => setIsSetup(true)}
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <p className="text-white text-lg font-bold mb-2">Default Search Engine</p>
+                    <select
+                        className="bg-gray-700 text-center text-white px-4 py-2 rounded w-full"
+                        value={defaultEngine[2]}
+                        onChange={(e) => {
+                            const selectedEngine = searchEngines.find(engine => engine[2] === e.target.value);
+                            setDefaultEngine(selectedEngine);
+                            }}
                     >
-                        <i className="fas fa-times"></i>
+                        {searchEngines.map((engine, index) => (
+                            <option key={index} value={engine[2]}>
+                            {engine[2]}
+                            </option>
+                        ))}
+                    </select>
+                    <p className="text-white text-lg font-bold mt-4">Theme</p>
+                    <select
+                        className="bg-gray-700 text-center text-white px-4 py-2 rounded w-full"
+                        value={currentTheme.className}
+                        onChange={(e) => setCurrentTheme(themes.find(theme => theme.className === e.target.value))}
+                        >
+                            {themes.map(theme => (
+                                <option key={theme.name} value={theme.className}>{theme.name}</option>
+                            ))}
+                    </select>
+                    <div className="flex items-center mb-2">
+                        <span className="text-white mr-2" style={{ width: '200px' }}>Enable News</span>
+                        <div className="relative">
+                            <input 
+                            type="checkbox" 
+                            checked={enableNews} 
+                            onChange={(e) => setEnableNews(e.target.checked)} 
+                            className="hidden"
+                            />
+                            <div className={`toggle-switch ${enableNews ? 'on' : 'off'}`} onClick={() => setEnableNews(!enableNews)}></div>
+                            <div className={`toggle-thumb ${enableNews ? 'on' : 'off'}`}></div>
+
+                    </div>
+                </div>
+                    <div className="flex items-center mb-2">
+                        <span className="text-white mr-2" style={{ width: '200px' }}>Enable Weather</span>
+                        <div className="relative">
+                            <input 
+                            type="checkbox" 
+                            checked={enableWeather} 
+                            onChange={(e) => setEnableWeather(e.target.checked)} 
+                            className="hidden"
+                            />
+                            <div className={`toggle-switch ${enableWeather ? 'on' : 'off'}`} onClick={() => setEnableWeather(!enableWeather)}></div>
+                            <div className={`toggle-thumb ${enableWeather ? 'on' : 'off'}`}></div>
+                        </div>
+                    </div>
+                    {enableWeather && (
+                        <div className="flex items-center space-x-4">
+                            <p className="text-white font-bold">Location</p>
+                            <input
+                            type="text"
+                            className="bg-gray-700 text-white px-4 py-2 rounded w-full"
+                            placeholder="City, Region, Country"
+                            value={weatherLocation}
+                            onChange={(e) => setWeatherLocation(e.target.value)}
+                            />
+                        </div>
+                    )}
+                    <button
+                        className="bg-blue-500 text-white px-4 py-2 rounded w-full"
+                        onClick={handleSaveSetup}
+                        >
+                        Save Setup
                     </button>
                 </div>
-                {weatherData ? (
-                    <div>
-                        <p className="text-lg font-bold mb-2">{location}</p>
-                        {renderHourlyTemperatureTable()}
-                    </div>
-                 ) : (
-                    <p>Loading weather data...</p>
-                )}
             </div>
         );
     };
 
     return (
         <div className="absolute w-full h-full bg-black">
+            {!isSetup && <SetupPopup />}
             {showArticlePopup && <ArticlePopup />}
             {showAddNotePopup && (
                 <AddNotePopup
@@ -640,32 +709,12 @@ function App() {
             )}
             <div className="relative select-none top-0 left-0 right-0 flex justify-between items-center p-4 bg-black">
                 <div className="flex items-center">
-                    <i 
-                        className="fas fa-bars text-white text-2xl mr-4 cursor-pointer" 
-                        onClick={toggleSidebar}
-                    ></i>
                     <img src="assets/augur.png" alt="Augur" className="w-8 h-8"/>
                     <span className="text-white text-2xl">UGUR</span>
                 </div>
                 {/*<div className="justify-right items-center text-right text-white" dangerouslySetInnerHTML={{ __html: dateTime + "<br>" + systemInfo }}></div>*/}
 
             </div>
-            {isSidebarOpen && (
-                <div ref={sidebarRef} className="fixed top-0 left-0 h-full w-64 bg-gray-800 text-white shadow-lg z-50">
-                    <div className="p-4">
-                        <div className="flex items-center mb-4">
-                            <img src="assets/augur.png" alt="Augur" className="w-8 h-8" />
-                            <span className="text-white text-2xl">UGUR</span>       
-                        </div>
-                        <ul>
-                            <li className="py-2 hover:underline hover:cursor-pointer" onClick={() => document.getElementById('news').classList.toggle('hidden')}><i className="fas fa-newspaper mr-2"></i>News</li>
-                            <li className="py-2 hover:underline hover:cursor-pointer"><i className="fas fa-calculator mr-3"></i>Calculator</li>
-                            <li className="py-2 hover:underline hover:cursor-pointer" onClick={() => document.getElementById('weather').classList.toggle('hidden')}><i className="fas fa-cloud-sun-rain mr-2"></i>Weather</li>
-                        </ul>
-                        <button onClick={toggleSidebar} className="mt-4 bg-red-500 text-white p-2 rounded">Close</button>
-                    </div>
-                </div>
-            )}
             <div className="absolute vertical-center horizontal-center left-0 right-0 flex flex-col items-center mt-4">
                 <div className="mb-4">
                     <div className="flex select-none items-center">
@@ -728,6 +777,18 @@ function App() {
                     </div>
                 </div>
             </div>
+            {(enableNews || enableWeather) ? (
+                <>
+                    <div className= "mt-48">
+                        {enableNews && (
+                            renderNews()
+                        )}
+                        {enableWeather && (
+                            renderWeather()
+                        )}
+                    </div>
+                </>
+            ) : null}
             <div className="absolute bottom-0 left-0 right-0 flex justify-between items-center p-4 bg-black">
                 <div className="flex items-center space-x-4">
                     <i 
@@ -747,12 +808,6 @@ function App() {
                         <i className="fas fa-cog text-white text-2xl "></i>
                     </button>
                 </div>
-            </div>
-            <div id="news" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
-                {renderNews()}
-            </div>
-            <div id="weather" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
-                {renderWeather()}
             </div>
             <div id="settings" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
                 <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
@@ -790,18 +845,49 @@ function App() {
                             <option key={theme.name} value={theme.className}>{theme.name}</option>
                         ))}
                     </select>
-                    <h2 className="text-white text-lg font-bold mt-4">Weather Settings</h2>
-                    <div className="flex items-center space-x-4 mt-4">
-                        <p className="text-white font-bold">Location</p>
-                        <input
-                            type="text"
-                            className="bg-gray-700 text-white px-4 py-2 rounded w-full"
-                            placeholder="City, Region, Country"
-                            value={weatherLocation}
-                            onChange={handleLocationChange}
-                        />
+                    <div className="flex items-center mb-2">
+                        <span className="text-white mr-2" style={{ width: '200px' }}>Enable News</span>
+                        <div className="relative">
+                            <input 
+                                type="checkbox" 
+                                checked={enableNews} 
+                                onChange={(e) => setEnableNews(e.target.checked)} 
+                                className="hidden"
+                            />
+                            <div className={`toggle-switch ${enableNews ? 'on' : 'off'}`} onClick={() => setEnableNews(!enableNews)}>
+                                <div className={`toggle-thumb ${enableNews ? 'on' : 'off'}`}></div>
+                            </div>
+                        </div>
                     </div>
-
+                    <div className="flex items-center mb-2">
+                        <span className="text-white mr-2" style={{ width: '200px' }}>Enable Weather</span>
+                        <div className="relative">
+                            <input 
+                                type="checkbox" 
+                                checked={enableWeather} 
+                                onChange={(e) => setEnableWeather(e.target.checked)} 
+                                className="hidden"
+                            />
+                            <div className={`toggle-switch ${enableWeather ? 'on' : 'off'}`} onClick={() => setEnableWeather(!enableWeather)}>
+                                <div className={`toggle-thumb ${enableWeather ? 'on' : 'off'}`}></div>
+                            </div>
+                        </div>
+                    </div>
+                    {enableWeather && (
+                        <>
+                            <h2 className="text-white text-lg font-bold mt-4">Weather Settings</h2>
+                            <div className="flex items-center space-x-4">
+                                <p className="text-white font-bold">Location</p>
+                                <input
+                                    type="text"
+                                    className="bg-gray-700 text-white px-4 py-2 rounded w-full"
+                                    placeholder="City, Region, Country"
+                                    value={weatherLocation}
+                                    onChange={handleLocationChange}
+                                />
+                            </div>
+                        </>
+                    )}
                     <div className="flex items-center space-x-4 mt-4">
                         <p className="text-white text-lg font-bold">Custom Links</p>
                         <button className="text-white rounded" onClick={() => document.getElementById('linkSettings').classList.toggle('hidden')}>
