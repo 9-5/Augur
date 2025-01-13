@@ -75,6 +75,9 @@ function App() {
     const [suggestions, setSuggestions] = useState([]);
     const spiderRef = useRef(null);
     const [spiderRefInitialized, setSpiderRefInitialized] = useState(false);
+    const suggestionRef = useRef(null);
+    const weatherRef = useRef(null);
+    const newsRef = useRef(null);
     const dropdownRef = useRef(null);
     const [customLinks, setCustomLinks] = useState(() => {
         const savedLinks = localStorage.getItem('customLinks');
@@ -96,7 +99,8 @@ function App() {
     const [articleTitle, setArticleTitle] = useState(null);
     const [enableNews, setEnableNews] = useState(() => JSON.parse(localStorage.getItem('enableNews')) || false);
     const [enableWeather, setEnableWeather] = useState(() => JSON.parse(localStorage.getItem('enableWeather')) || false);
-    
+    const [showCalculator, setShowCalculator] = useState(false);
+
     const fetchArticleContent = async (url) => {
         try {
             const response = await fetch(`https://cors.ż.co/api/2?url=${url}`);
@@ -147,16 +151,20 @@ function App() {
     };
     
     const fetchNews = async (url) => {
-        spiderRef.current.postMessage({ mode: 'news', query: url });
+        if  (newsRef.current) {
+        newsRef.current.postMessage({ mode: 'news', query: url });
         return new Promise(resolve => {
             const handleNewsMessage = (event) => {
                 if (event.data.mode === 'news') {
-                    spiderRef.current.removeEventListener('message', handleNewsMessage);
+                    newsRef.current.removeEventListener('message', handleNewsMessage);
                     resolve(event.data.data);
                 }
             };
-            spiderRef.current.addEventListener('message', handleNewsMessage);
+            newsRef.current.addEventListener('message', handleNewsMessage);
         });
+        } else {
+            return [];
+        }
     };
     const fetchAndProcessNews = async () => {
         const newsList = [];
@@ -201,30 +209,42 @@ function App() {
     };
 
     useEffect(() => {
-        spiderRef.current = new Worker('assets/js/workers/spider.js');
-        spiderRef.current.onmessage = (event) => {
+        suggestionRef.current = new Worker('assets/js/workers/spider.js');
+        weatherRef.current = new Worker('assets/js/workers/spider.js');
+        newsRef.current = new Worker('assets/js/workers/spider.js');
+        
+        suggestionRef.current.onmessage = (event) => {
             if (event.data.error) {
-                console.error(`Worker error: ${event.data.error}`);
+                console.error(`Suggestions worker error: ${event.data.error}`);
             } else {
-                if (event.data.mode === 'search') {
-                    setSuggestions(event.data.data);
-                } else if (event.data.mode === 'weather') {
-                    setWeatherData(event.data.data);
-                } else if (event.data.mode === 'news') {
-                    processXML(event.data.data)
-                  }
-                }
-              };
-            setSpiderRefInitialized(true);
-            }, []);
+                setSuggestions(event.data.data);
+            }
+        };
+        
+        weatherRef.current.onmessage = (event) => {
+            if (event.data.error) {
+                console.error(`Weather worker error: ${event.data.error}`);
+            } else {
+                setWeatherData(event.data.data);
+            }
+        };
+        
+        newsRef.current.onmessage = (event) => {
+            if (event.data.error) {
+                console.error(`News worker error: ${event.data.error}`);
+            } else {
+                processXML(event.data.data);
+            }
+        };
+    }, []);
     
     const fetchWeatherData = (location) => {
-        if (spiderRefInitialized) {
-            spiderRef.current.postMessage({ mode: 'weather', query: location });
+        if (weatherRef.current) {
+          weatherRef.current.postMessage({ mode: 'weather', query: location });
         } else {
-            console.log();
+          console.error('Weather worker not initialized');
         }
-    };
+      };
 
     useEffect(() => {
         localStorage.setItem('customLinks', JSON.stringify(customLinks));
@@ -256,7 +276,7 @@ function App() {
 
     useEffect(() => {
         if (query.length > 2) {
-            spiderRef.current.postMessage({ mode: 'search', query });
+            suggestionRef.current.postMessage({ mode: 'search', query });
         } else {
             setSuggestions([]);
         }
@@ -354,11 +374,12 @@ function App() {
         return (
             <Draggable>
                 <div className="sticky-note bg-gray-800 p-4 rounded shadow-lg relative w-64 cursor-move">
+                    <p className="text-white font-bold mb-2">Note</p>
                     <button 
-                        className="absolute top-1 right-1 text-white hover:text-gray-400"
+                        className="absolute top-1 right-2 text-white hover:text-gray-400"
                         onClick={onClose}
                     >
-                        <i className="fas fa-times"></i>
+                        <i className="fas fa-times text-2xl"></i>
                     </button>
                     <p
                         contentEditable={true}
@@ -643,8 +664,72 @@ function App() {
         );
     };
 
+    const handleCalculatorClose = () => {
+        setShowCalculator(false);
+    };
+
+    const Calculator = ({ onClose }) => {
+        const [input, setInput] = useState("");
+    
+        const handleClick = (value) => {
+            setInput(input + value);
+        };
+    
+        const handleClear = () => {
+            setInput("");
+        };
+    
+        const handleEqual = () => {
+            try {
+                setInput(eval(input).toString());
+            } catch {
+                setInput("Error");
+            }
+        };
+    
+        return (
+            <Draggable>
+                <div className="max-w-xs bg-gray-800 p-4 rounded-lg shadow-lg">
+                    <h2 className="text-white text-lg font-bold mb-4">Calculator</h2>
+                    <i 
+                        className="fas fa-times text-white absolute top-2 right-2 cursor-pointer" 
+                        onClick={onClose}
+                    ></i>
+                    <div className="mb-4">
+                        <input 
+                            type="text" 
+                            value={input} 
+                            className="w-full p-2 text-right bg-gray-700 rounded text-xl" 
+                            readOnly 
+                        />
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                        <button onClick={handleClear} className="bg-red-500 p-2 rounded text-lg">C</button>
+                        <button onClick={() => handleClick('/')} className="bg-gray-600 p-2 rounded text-lg">/</button>
+                        <button onClick={() => handleClick('*')} className="bg-gray-600 p-2 rounded text-lg">*</button>
+                        <button onClick={() => handleClick('-')} className="bg-gray-600 p-2 rounded text-lg">-</button>
+                        <button onClick={() => handleClick('7')} className="bg-gray-700 p-2 rounded text-lg">7</button>
+                        <button onClick={() => handleClick('8')} className="bg-gray-700 p-2 rounded text-lg">8</button>
+                        <button onClick={() => handleClick('9')} className="bg-gray-700 p-2 rounded text-lg">9</button>
+                        <button onClick={() => handleClick('+')} className="bg-gray-600 p-2 rounded text-lg">+</button>
+                        <button onClick={() => handleClick('4')} className="bg-gray-700 p-2 rounded text-lg">4</button>
+                        <button onClick={() => handleClick('5')} className="bg-gray-700 p-2 rounded text-lg">5</button>
+                        <button onClick={() => handleClick('6')} className="bg-gray-700 p-2 rounded text-lg">6</button>
+                        <button onClick={handleEqual} className="row-span-2 bg-green-500 p-2 rounded text-lg">=</button>
+                        <button onClick={() => handleClick('1')} className="bg-gray-700 p-2 rounded text-lg">1</button>
+                        <button onClick={() => handleClick('2')} className="bg-gray-700 p-2 rounded text-lg">2</button>
+                        <button onClick={() => handleClick('3')} className="bg-gray-700 p-2 rounded text-lg">3</button>
+                        <button onClick={() => handleClick('0')} className="col-span-2 bg-gray-700 p-2 rounded text-lg">0</button>
+                        <button onClick={() => handleClick('.')} className="bg-gray-700 p-2 rounded text-lg">.</button>
+                    </div>
+                </div>
+            </Draggable>
+        );
+    };
+
     return (
         <div className="absolute w-full h-full bg-black">
+            
             {!isSetup && <SetupPopup />}
             {showArticlePopup && <ArticlePopup />}
             {showAddNotePopup && (
@@ -662,6 +747,12 @@ function App() {
                     />
                 </div>
             )}
+            {showCalculator && 
+                <div className="fixed top-4 right-4 z-50">
+                    <Calculator 
+                    onClose={handleCalculatorClose}/>
+                </div>
+            }
             {showStickyNotes && (
                 <div className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
                     <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
@@ -684,7 +775,6 @@ function App() {
                                 ));
 
                                 return (
-
                                     <div key={index} className="flex justify-between items-center mb-2 hover:bg-gray-700 p-2 rounded">
                                         <p 
                                             className="text-white cursor-pointer flex-grow"
@@ -796,8 +886,12 @@ function App() {
                         onClick={handleViewStickyNotes}
                     ></i>
                     <i 
-                        className="fas fa-plus-circle text-white text-2xl cursor-pointer" 
+                        className="fas fa-sticky-note text-white text-2xl cursor-pointer relative" 
                         onClick={handleAddStickyNote}
+                    ></i>
+                    <i 
+                        className="fas fa-tools text-white text-2xl cursor-pointer" 
+                        onClick={() => document.getElementById('tools').classList.toggle('hidden')}
                     ></i>
                 </div>
                 <div className="flex items-center space-x-4">
@@ -807,6 +901,12 @@ function App() {
                     >
                         <i className="fas fa-cog text-white text-2xl "></i>
                     </button>
+                </div>
+            </div>
+            <div id="tools"className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
+                <div className="flex flex-col items-center justify-center h-screen">
+                    <p className="text-white text-2xl font-bold mb-4" onClick={() => document.getElementById('tools').classList.add('hidden')}>Tools</p>
+                    <i className="fas fa-calculator text-white text-2xl cursor-pointer relative" onClick={() => {setShowCalculator(true); }}></i>
                 </div>
             </div>
             <div id="settings" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
