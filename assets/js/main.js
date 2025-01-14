@@ -184,10 +184,10 @@ function App() {
         return (
             <div className="flex flex-col  overflow-x-hidden mt-2">
                 <h2 className="align-left text-white text-2xl font-bold ml-4">News</h2>
-                <div className="overflow-x-auto overflow-y-hidden items-center ml-4 h-full w-full sm:h-64 sm:w-full md:h-full md:w-full">
+                <div className="overflow-x-auto items-center overflow-y-hidden h-full w-full sm:h-64 sm:w-full md:h-full md:w-full">
                     <div className="news-grid flex flex-nowrap">
                     {news.map((article, index) => (
-                        <div key={index} className="news-item bg-gray-800 p-4 rounded shadow-lg2">
+                        <div key={index} className="news-item bg-gray-800 p-4 rounded shadow-lg ml-4">
                             <h3 
                                 className="text-white text-md font-bold hover:underline hover:cursor-pointer break-words md:break-normal overflow-scroll"
                                 onClick={(e) => {
@@ -516,7 +516,7 @@ function App() {
                             <div className="weather-grid flex flex-nowrap">
                                 {weatherData && weatherData.hourly && weatherData.hourly.data.slice(start).map((hour, index) => {
                                     const date = new Date(hour.time * 1000);
-                                    const dateString = date.toLocaleDateString([], { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' });
+                                    const dateString = date.toLocaleDateString([], { weekday: 'short', year: '2-digit', month: '2-digit', day: '2-digit' });
                                     const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                                     const dateTimeString = `${dateString} ${timeString}`;
                                     
@@ -525,9 +525,25 @@ function App() {
                                     
                                     const precipType = hour.precipType || 'N/A';
                                     const precipAcc = hour.precipAccumulation || 0;
+                                    const icon = hour.icon;
+                                    const iconMap = {
+                                        "clear-day": "sun",
+                                        "clear-night": "moon",
+                                        "rain": "cloud-rain",
+                                        "snow": "snowflake",
+                                        "sleet": "",
+                                        "wind": "wind",
+                                        "fog": "smog",
+                                        "cloudy": "water",
+                                        "partly-cloudy-day": "cloud-sun",
+                                        "partly-cloudy-night": "cloud-moon"
+                                    }
+                                    const iconClass = iconMap[icon];
                                     return (
                                         <div key={index} className="weather-item flex flex-row ml-4 bg-gray-800 p-4 rounded shadow-lg">
-                                            <h3 className="text-white text-lg font-bold text-center">{dateTimeString}</h3>
+                                            <h4 className="text-white text-lg font-bold text-left">{dateTimeString}</h4>
+                                            <i className={`fas fa-${iconClass} text-white fa-2x`}></i>
+
                                             <div id="temperature" className="ml-4 flex flex-col">
                                                 <p className="text-white text-sm ml-3">🌡️</p>
                                                 <p className="text-white text-sm">{temperatureFahrenheit.toFixed(2)}°F</p>
@@ -541,6 +557,7 @@ function App() {
                                                 <p className="text-white text-sm ml-1">💧</p>
                                                 <p className="text-white text-sm">{precipAcc.toFixed(2)} mm</p>
                                             </div>
+                                            <i className="fas fa-weather-cloudy top-0 left-0 right-0 bottom-0"></i>
                                         </div>
                                     )
                                 })}
