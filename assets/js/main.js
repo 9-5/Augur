@@ -58,6 +58,8 @@ const rssFeeds = [
     "https://www.theguardian.com/world/rss"
     ];
 
+
+
 function App() {
     const [isSetup, setIsSetup] = useState(() => localStorage.getItem('isSetup') === 'true');
     const [defaultEngine, setDefaultEngine] = useState(() => {
@@ -71,10 +73,7 @@ function App() {
     const [query, setQuery] = useState("");
     const [dropdown, setDropdown] = useState(null);
     const [dateTime, setDateTime] = useState("");
-    const [systemInfo, setSystemInfo] = useState("");
     const [suggestions, setSuggestions] = useState([]);
-    const spiderRef = useRef(null);
-    const [spiderRefInitialized, setSpiderRefInitialized] = useState(false);
     const suggestionRef = useRef(null);
     const weatherRef = useRef(null);
     const newsRef = useRef(null);
@@ -100,7 +99,27 @@ function App() {
     const [enableNews, setEnableNews] = useState(() => JSON.parse(localStorage.getItem('enableNews')) || false);
     const [enableWeather, setEnableWeather] = useState(() => JSON.parse(localStorage.getItem('enableWeather')) || false);
     const [showCalculator, setShowCalculator] = useState(false);
+    const [showDevice, setShowDevice] = useState(false);
 
+
+    const Time = () => {
+        const [currentTime, setCurrentTime] = useState(new Date());
+        useEffect(() => {
+            const interval = setInterval(() => {
+                setCurrentTime(new Date());
+            }, 100);
+            return () => clearInterval(interval);
+        }, []);
+        
+
+        return (
+            <>
+                <span className="text-white ml-2">{currentTime.toLocaleDateString([], { weekday: 'long', month: 'short', day: '2-digit' })}</span>
+                <span className="text-white ml-2">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+            </>
+        );
+    }
+    
     const fetchArticleContent = async (url) => {
         try {
             const response = await fetch(`https://cors.ż.co/api/2?url=${url}`);
@@ -283,10 +302,6 @@ function App() {
     }, [query]);
 
     useEffect(() => {
-        buildSystemInfo();
-    }, []);
-
-    useEffect(() => {
         localStorage.setItem('searchEngine', JSON.stringify(defaultEngine));
     }, [defaultEngine]);
 
@@ -302,35 +317,6 @@ function App() {
     useEffect(() => {
         localStorage.setItem('enableWeather', JSON.stringify(enableWeather));
     }, [enableWeather]);
-
-    const buildSystemInfo = () => {
-        const pixelRatio = window.devicePixelRatio;
-        const realWidth = Math.round(window.screen.width * pixelRatio);
-        const realHeight = Math.round(window.screen.height * pixelRatio);
-
-        const userAgent = navigator.userAgent;
-        let os = "Unknown OS";
-        if (userAgent.indexOf("Win") !== -1) os = "Windows";
-        if (userAgent.indexOf("Mac") !== -1) os = "macOS";
-        if (userAgent.indexOf("Linux") !== -1) os = "Linux";
-        if (userAgent.indexOf("iPhone") !== -1 || userAgent.indexOf("iPad") !== -1 || userAgent.indexOf("iPod") !== -1) os = "iOS";
-        if (userAgent.indexOf("Android") !== -1) os = "Android";
-
-        let browser = "Unknown Browser";
-        if (userAgent.indexOf("Chrome") !== -1 && userAgent.indexOf("Edg") === -1 && userAgent.indexOf("OPR") === -1) browser = "Chrome";
-        if (userAgent.indexOf("Firefox") !== -1) browser = "Firefox";
-        if (userAgent.indexOf("Safari") !== -1 && userAgent.indexOf("Chrome") === -1) browser = "Safari";
-        if (userAgent.indexOf("Edg") !== -1) browser = "Edge";
-        if (userAgent.indexOf("OPR") !== -1) browser = "Opera";
-
-        const browserVersion = userAgent.match(/(Chrome|Firefox|Safari|Edg|OPR)\/(\d+)/);
-        const version = browserVersion ? browserVersion[2] : "Unknown";
-
-        let binfo = `${os}<br>${browser} ${version}<br>${realWidth} x ${realHeight}`;
-        let threadnum = window.navigator.hardwareConcurrency;
-        let logical = `${threadnum} Threads`;
-        setSystemInfo(`${binfo}<br>${logical}`);
-    };
 
     const handleSearch = () => {
         const searchUrl = defaultEngine[1].replace("{Q}", query);
@@ -372,19 +358,19 @@ function App() {
         };
     
         return (
-            <Draggable>
+            <Draggable cancel={".interactable"}>
                 <div className="sticky-note bg-gray-800 p-4 rounded shadow-lg relative w-64 cursor-move">
                     <p className="text-white font-bold mb-2">Note</p>
                     <button 
-                        className="absolute top-1 right-2 text-white hover:text-gray-400"
+                        className="interactable absolute top-1 right-2 text-white hover:text-gray-400"
                         onClick={onClose}
                     >
-                        <i className="fas fa-times text-2xl"></i>
+                        <i className="fas fa-times"></i>
                     </button>
                     <p
                         contentEditable={true}
                         onInput={handleInput}
-                        className="outline-none"
+                        className="outline-none interactable"
                         suppressContentEditableWarning={true}
                     >
                         {note.split('\n').map((line, index) => (
@@ -396,7 +382,7 @@ function App() {
                     </p>
                     {isEdited && (
                         <button
-                            className="bg-green-500 text-white px-4 py-2 rounded mt-2 w-full"
+                            className="interactable bg-green-500 text-white px-4 py-2 rounded mt-2 w-full"
                             onClick={handleEditStickyNote}
                         >
                             Save
@@ -599,12 +585,6 @@ function App() {
                 <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                         <h1 className="text-white font-bold text-xl mb-4">Setup</h1>
-                        <button
-                            className="text-white mr-2 mb-4 hover:text-gray-400"
-                            onClick={() => setIsSetup(true)}
-                        >
-                            <i className="fas fa-times"></i>
-                        </button>
                     </div>
                     <p className="text-white text-lg font-bold mb-2">Default Search Engine</p>
                     <select
@@ -687,9 +667,17 @@ function App() {
 
     const Calculator = ({ onClose }) => {
         const [input, setInput] = useState("");
-    
+        
         const handleClick = (value) => {
-            setInput(input + value);
+            console.log(input);
+            if (input === "") {
+                setInput(value);
+            } else if (input === "Error") {
+                setInput("");
+                setInput(value);
+            } else {
+                setInput(input + value);
+            }
         };
     
         const handleClear = () => {
@@ -705,11 +693,11 @@ function App() {
         };
     
         return (
-            <Draggable>
+            <Draggable cancel={".interactable"}>
                 <div className="max-w-xs bg-gray-800 p-4 rounded-lg shadow-lg">
                     <h2 className="text-white text-lg font-bold mb-4">Calculator</h2>
                     <i 
-                        className="fas fa-times text-white absolute top-2 right-2 cursor-pointer" 
+                        className="interactable fas fa-times text-white absolute top-2 right-2 cursor-pointer" 
                         onClick={onClose}
                     ></i>
                     <div className="mb-4">
@@ -721,29 +709,117 @@ function App() {
                         />
                     </div>
                     <div className="grid grid-cols-4 gap-2">
-                        <button onClick={handleClear} className="bg-red-500 p-2 rounded text-lg">C</button>
-                        <button onClick={() => handleClick('/')} className="bg-gray-600 p-2 rounded text-lg">/</button>
-                        <button onClick={() => handleClick('*')} className="bg-gray-600 p-2 rounded text-lg">*</button>
-                        <button onClick={() => handleClick('-')} className="bg-gray-600 p-2 rounded text-lg">-</button>
-                        <button onClick={() => handleClick('7')} className="bg-gray-700 p-2 rounded text-lg">7</button>
-                        <button onClick={() => handleClick('8')} className="bg-gray-700 p-2 rounded text-lg">8</button>
-                        <button onClick={() => handleClick('9')} className="bg-gray-700 p-2 rounded text-lg">9</button>
-                        <button onClick={() => handleClick('+')} className="bg-gray-600 p-2 rounded text-lg">+</button>
-                        <button onClick={() => handleClick('4')} className="bg-gray-700 p-2 rounded text-lg">4</button>
-                        <button onClick={() => handleClick('5')} className="bg-gray-700 p-2 rounded text-lg">5</button>
-                        <button onClick={() => handleClick('6')} className="bg-gray-700 p-2 rounded text-lg">6</button>
-                        <button onClick={handleEqual} className="row-span-2 bg-green-500 p-2 rounded text-lg">=</button>
-                        <button onClick={() => handleClick('1')} className="bg-gray-700 p-2 rounded text-lg">1</button>
-                        <button onClick={() => handleClick('2')} className="bg-gray-700 p-2 rounded text-lg">2</button>
-                        <button onClick={() => handleClick('3')} className="bg-gray-700 p-2 rounded text-lg">3</button>
-                        <button onClick={() => handleClick('0')} className="col-span-2 bg-gray-700 p-2 rounded text-lg">0</button>
-                        <button onClick={() => handleClick('.')} className="bg-gray-700 p-2 rounded text-lg">.</button>
+                        <button onClick={handleClear} className="interactable bg-red-500 p-2 rounded text-lg">C</button>
+                        <button onClick={() => handleClick('/')} className="interactable bg-gray-600 p-2 rounded text-lg">/</button>
+                        <button onClick={() => handleClick('*')} className="interactable bg-gray-600 p-2 rounded text-lg">*</button>
+                        <button onClick={() => handleClick('-')} className="interactable bg-gray-600 p-2 rounded text-lg">-</button>
+                        <button onClick={() => handleClick('7')} className="interactable bg-gray-700 p-2 rounded text-lg">7</button>
+                        <button onClick={() => handleClick('8')} className="interactable bg-gray-700 p-2 rounded text-lg">8</button>
+                        <button onClick={() => handleClick('9')} className="interactable bg-gray-700 p-2 rounded text-lg">9</button>
+                        <button onClick={() => handleClick('+')} className="interactable bg-gray-600 p-2 rounded text-lg">+</button>
+                        <button onClick={() => handleClick('4')} className="interactable bg-gray-700 p-2 rounded text-lg">4</button>
+                        <button onClick={() => handleClick('5')} className="interactable bg-gray-700 p-2 rounded text-lg">5</button>
+                        <button onClick={() => handleClick('6')} className="interactable bg-gray-700 p-2 rounded text-lg">6</button>
+                        <button onClick={handleEqual} className="interactable row-span-2 bg-green-500 p-2 rounded text-lg">=</button>
+                        <button onClick={() => handleClick('1')} className="interactable bg-gray-700 p-2 rounded text-lg">1</button>
+                        <button onClick={() => handleClick('2')} className="interactable bg-gray-700 p-2 rounded text-lg">2</button>
+                        <button onClick={() => handleClick('3')} className="interactable bg-gray-700 p-2 rounded text-lg">3</button>
+                        <button onClick={() => handleClick('0')} className="interactable col-span-2 bg-gray-700 p-2 rounded text-lg">0</button>
+                        <button onClick={() => handleClick('.')} className="interactable bg-gray-700 p-2 rounded text-lg">.</button>
                     </div>
                 </div>
             </Draggable>
         );
     };
 
+    const handleDeviceClose = () => {
+        setShowDevice(false);
+    };
+
+    const Device = ({ onClose }) => {
+        const [deviceInfo, setDeviceInfo] = useState({});
+    
+        useEffect(() => {
+            const getDeviceInfo = async () => {
+                const deviceInfo = {};
+    
+                const ipResponse = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipResponse.json();
+                deviceInfo.ipAddress = ipData.ip;
+    
+                deviceInfo.browser = navigator.userAgent;
+                deviceInfo.browserName = getBrowserName(navigator.userAgent);
+                deviceInfo.browserVersion = getBrowserVersion(navigator.userAgent);
+    
+                deviceInfo.deviceType = getDeviceType(navigator.userAgent);
+    
+                deviceInfo.deviceOS = getDeviceOS(navigator.userAgent);
+                deviceInfo.deviceOSVersion = getDeviceOSVersion(navigator.userAgent);
+    
+                deviceInfo.screenResolution = `${window.screen.width}x${window.screen.height}`;
+        
+                setDeviceInfo(deviceInfo);
+            };
+    
+            getDeviceInfo();
+        }, []);
+    
+        const getBrowserName = (userAgent) => {
+            if (userAgent.indexOf('Chrome') !== -1) return 'Chrome';
+            if (userAgent.indexOf('Firefox') !== -1) return 'Firefox';
+            if (userAgent.indexOf('Safari') !== -1) return 'Safari';
+            if (userAgent.indexOf('Edge') !== -1) return 'Edge';
+            if (userAgent.indexOf('Opera') !== -1) return 'Opera';
+            return 'Unknown';
+        };
+    
+        const getBrowserVersion = (userAgent) => {
+            const versionRegex = /Version\/(\d+\.\d+\.\d+)/;
+            const match = userAgent.match(versionRegex);
+            return match && match[1] ? match[1] : 'Unknown';
+        };
+    
+        const getDeviceType = (userAgent) => {
+            if (userAgent.indexOf('Mobile') !== -1) return 'Mobile';
+            if (userAgent.indexOf('Tablet') !== -1) return 'Tablet';
+            return 'Desktop';
+        };
+    
+        const getDeviceOS = (userAgent) => {
+            if (userAgent.indexOf('Windows') !== -1) return 'Windows';
+            if (userAgent.indexOf('Mac OS X') !== -1) return 'macOS';
+            if (userAgent.indexOf('Linux') !== -1) return 'Linux';
+            if (userAgent.indexOf('Android') !== -1) return 'Android';
+            if (userAgent.indexOf('iOS') !== -1) return 'iOS';
+            return 'Unknown';
+        };
+    
+        const getDeviceOSVersion = (userAgent) => {
+            const versionRegex = /Android (\d+\.\d+)/;
+            const match = userAgent.match(versionRegex);
+            return match && match[1] ? match[1] : 'Unknown';
+        };
+    
+        return (
+        <Draggable cancel={".interactable"}>
+            <div className="fixed bottom-4 right-4 z-50 max-w-xs bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h2>Device Information</h2>
+                <i 
+                        className="interactable fas fa-times text-white absolute top-2 right-2 cursor-pointer" 
+                        onClick={handleDeviceClose}
+                    ></i>
+                <ul>
+                    <li>IP Address: {deviceInfo.ipAddress}</li>
+                    <li>Browser: {deviceInfo.browserName} {deviceInfo.browserVersion}</li>
+                    <li>Device Type: {deviceInfo.deviceType}</li>
+                    <li>Device OS: {deviceInfo.deviceOS} {deviceInfo.deviceOSVersion}</li>
+                    <li>Screen Resolution: {deviceInfo.screenResolution}</li>
+                </ul>
+            </div>
+        </Draggable>
+        );
+    };
+    
     return (
         <div className="absolute w-full h-full bg-black">
             
@@ -770,6 +846,7 @@ function App() {
                     onClose={handleCalculatorClose}/>
                 </div>
             }
+            {showDevice && <Device /> }
             {showStickyNotes && (
                 <div className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
                     <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
@@ -814,14 +891,14 @@ function App() {
                     </div>
                 </div>
             )}
-            <div className="relative select-none top-0 left-0 right-0 flex justify-between items-center p-4 bg-black">
+            <div className="relative font-bold select-none top-0 left-0 right-0 flex justify-between items-center p-4 bg-black">
                 <div className="flex items-center">
                     <img src="assets/augur.png" alt="Augur" className="w-8 h-8"/>
                     <span className="text-white text-2xl">UGUR</span>
                 </div>
-                {/*<div className="justify-right items-center text-right text-white" dangerouslySetInnerHTML={{ __html: dateTime + "<br>" + systemInfo }}></div>*/}
-
+                <Time />
             </div>
+            
             <div className="absolute vertical-center horizontal-center left-0 right-0 flex flex-col items-center mt-4">
                 <div className="mb-4">
                     <div className="flex select-none items-center">
@@ -924,6 +1001,7 @@ function App() {
                 <div className="flex flex-col items-center justify-center h-screen">
                     <p className="text-white text-2xl font-bold mb-4" onClick={() => document.getElementById('tools').classList.add('hidden')}>Tools</p>
                     <i className="fas fa-calculator text-white text-2xl cursor-pointer relative" onClick={() => {setShowCalculator(true); }}></i>
+                    <i className="fas fa-laptop text-white text-2xl cursor-pointer relative" onClick={() => {setShowDevice(true); }}></i>
                 </div>
             </div>
             <div id="settings" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
