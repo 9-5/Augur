@@ -29,6 +29,7 @@ th, td {
 .news-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    /* grid-gap: 10px; /* Consider adding gaps if using CSS grid */
 }
 .news-item {
     background-color: #333;
@@ -37,8 +38,8 @@ th, td {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    height: 230px;
-    width: inherit;
+    /* height: 230px; /* Let content define height or use min-height */
+    /* width: inherit; /* Width will be controlled by flex item properties */
 }
 .news-item h3 {
     font-size: 18px;
@@ -517,3 +518,88 @@ th, td {
 .amethyst .bg-opacity-50 {
     background-color: rgba(224, 242, 254, 0.5); 
 }
+
+/* RetroBoy Theme */
+.retroboy body, .retroboy { /* Apply to body and potentially root if needed */
+    font-family: 'Press Start 2P', cursive !important;
+    background-color: #000000 !important;
+    color: #00FF00 !important; /* Green text */
+}
+
+.retroboy .bg-gray-800, .retroboy div[class*="bg-gray-800"] { background-color: #222222 !important; border: 1px solid #00FF00; }
+.retroboy .bg-gray-700, .retroboy div[class*="bg-gray-700"] { background-color: #1a1a1a !important; border: 1px solid #00DD00; }
+.retroboy .bg-gray-600, .retroboy div[class*="bg-gray-600"] { background-color: #333333 !important; }
+.retroboy .text-white, .retroboy [class*="text-white"] { color: #00FF00 !important; }
+.retroboy .text-gray-400, .retroboy [class*="text-gray-400"] { color: #00AA00 !important; }
+.retroboy .text-blue-500, .retroboy [class*="text-blue-500"] { color: #00FFFF !important; } /* Cyan for links */
+.retroboy .hover\:text-white:hover { color: #FFFF00 !important; } /* Yellow hover */
+.retroboy .hover\:underline:hover { text-decoration: underline !important; }
+
+.retroboy .news-item, .retroboy .weather-item {
+    background-color: #111111 !important;
+    border: 2px solid #00FF00 !important;
+    box-shadow: 3px 3px #00AA00 !important;
+}
+.retroboy .news-item h3, .retroboy .weather-item h3 {
+    color: #00FF00 !important;
+}
+.retroboy .news-item p, .retroboy .weather-item p {
+    color: #00DD00 !important;
+}
+
+.retroboy input, .retroboy select, .retroboy textarea {
+    background-color: #000000 !important;
+    color: #00FF00 !important;
+    border: 1px solid #00FF00 !important;
+    caret-color: #00FF00 !important;
+}
+.retroboy input::placeholder { color: #00AA00 !important; }
+.retroboy button:not(.bg-red-500):not(.bg-green-500):not(.bg-blue-500) { /* General buttons */
+    background-color: #333333 !important;
+    color: #00FF00 !important;
+    border: 1px solid #00FF00 !important;
+    box-shadow: 1px 1px #00AA00 !important;
+}
+.retroboy button:not(.bg-red-500):not(.bg-green-500):not(.bg-blue-500):hover {
+    background-color: #444444 !important;
+    color: #FFFF00 !important;
+}
+.retroboy .bg-red-500, .retroboy .bg-red-600 { background-color: #DD0000 !important; border-color: #FF5555 !important; color: #FFFFFF !important; }
+.retroboy .bg-green-500 { background-color: #00AA00 !important; border-color: #55FF55 !important; color: #000000 !important; }
+.retroboy .bg-blue-500 { background-color: #0000AA !important; border-color: #5555FF !important; color: #FFFFFF !important; }
+
+.retroboy .toggle-switch { background-color: #555 !important; border: 1px solid #00FF00; width: 40px; height: 20px; }
+.retroboy .toggle-switch.on { background-color: #00AA00 !important; }
+.retroboy .toggle-thumb { background-color: #00FF00 !important; width: 16px; height: 16px; top: 1px; left: 1px;}
+.retroboy .toggle-thumb.on { transform: translateX(20px) !important; }
+
+.retroboy ::-webkit-scrollbar-thumb { background: #00AA00 !important; }
+.retroboy ::-webkit-scrollbar-thumb:hover { background: #00FF00 !important; }
+
+.retroboy .fas, .retroboy .fab { /* Font Awesome icons */
+    color: inherit; /* Inherit from parent, which should be themed */
+}
+.retroboy i.text-blue-500 { color: #00FFFF !important; }
+.retroboy i.hover\:text-white:hover { color: #FFFF00 !important; }
+.retroboy .hover\:text-gray-400:hover i { color: #00AA00 !important; }
+
+/* Draggable components in RetroBoy */
+.retroboy .sticky-note, 
+.retroboy .max-w-xs.bg-gray-800, /* Calculator */
+.retroboy div[class*="fixed bottom-4 right-4 z-50 max-w-xs bg-gray-800"] /* Device Info */ {
+    background-color: #111111 !important;
+    border: 2px solid #00FF00 !important;
+    box-shadow: 3px 3px #00AA00 !important;
+    color: #00FF00 !important;
+}
+
+/* Popup backgrounds */
+.retroboy .bg-black.bg-opacity-75 { background-color: rgba(0, 20, 0, 0.85) !important; }
+.retroboy .bg-gray-800.p-4.rounded { /* For popups like settings, article */
+    background-color: #111111 !important;
+    border: 2px solid #00FF00 !important;
+    box-shadow: 3px 3px #00AA00 !important;
+    color: #00FF00 !important;
+}
+
+.retroboy .bg-black { background-color: #000000 !important; }

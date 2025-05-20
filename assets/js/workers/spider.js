@@ -25,9 +25,9 @@ self.addEventListener('message', async (event) => {
         } else {
             data = await response.json();
         }
-        self.postMessage({ mode, data });
+        self.postMessage({ mode, data, query });
     } catch (error) {
         console.error(`Error: ${error.message}`);
-        self.postMessage({ mode, error: error.message });
+        self.postMessage({ mode, error: error.message, query });
     }
 });

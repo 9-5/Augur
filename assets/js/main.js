@@ -14,12 +14,12 @@ const searchEngines = [
 ];
 const iconLinks = {
     "folder": [
-        { title: "ż.co", url: "https://ż.co" },
+        { title: "Å¼.co", url: "https://Å¼.co" },
         { title: "0KB.org", url: "https://0kb.org" },
         { title: "Zennit @ 0KB", url: "https://zen.0kb.org" },
-        { title: "Zennit @ ż", url: "https://zen.ż.co" },
+        { title: "Zennit @ Å¼", url: "https://zen.Å¼.co" },
         { title: "Clock @ 0KB", url: "https://clock.0kb.org" },
-        { title: "Clock @ ż", url: "https://clock.ż.co" }
+        { title: "Clock @ Å¼", url: "https://clock.Å¼.co" }
     ],
     "film": [
         { title: "YouTube", url: "https://youtube.com" },
@@ -52,11 +52,11 @@ const iconLinks = {
     ],
 };
 
-const rssFeeds = [
+const defaultRssFeeds = [ // Renamed from rssFeeds
     "https://feeds.bbci.co.uk/news/rss.xml",
     "https://news.yahoo.com/rss/mostviewed",
     "https://www.theguardian.com/world/rss"
-    ];
+];
 
 
 
@@ -66,7 +66,7 @@ function App() {
         const savedEngine = localStorage.getItem('searchEngine');
         return savedEngine ? JSON.parse(savedEngine) : searchEngines[0];
     });
-    const themes = [{ name: 'Ocean', className: '' }, { name: 'Sky', className: 'sky' }, { name: 'Forest', className: 'forest' }, { name: 'Bamboo', className: 'bamboo' }, { name: 'Crimson', className: 'crimson' }, { name: 'Blush', className: 'blush' }, { name: 'Petal', className: 'petal' }, { name: 'Lotus', className: 'lotus' }, { name: 'Amethyst', className: 'amethyst' }, { name: 'RetroBoy', className: 'retroboy'}];
+    const themes = [{ name: 'Ocean', className: '' }, { name: 'Sky', className: 'sky' }, { name: 'Forest', className: 'forest' }, { name: 'Bamboo', className: 'bamboo' }, { name: 'Crimson', className: 'crimson' }, { name: 'Blush', className: 'blush' }, { name: 'Petal', className: 'petal' }, { name: 'Lotus', className: 'lotus' }, { name: 'Amethyst', className: 'amethyst' }, { name: 'RetroBoy', className: 'retroboy' }];
     const [currentTheme, setCurrentTheme] = useState(() => {
         return localStorage.getItem('theme') || 'Ocean';
     });
@@ -84,10 +84,16 @@ function App() {
     });
     const [stickyNotes, setStickyNotes] = useState(() => {
         const savedNotes = localStorage.getItem('stickyNotes');
-        return savedNotes ? JSON.parse(savedNotes) : [];
+        // Ensure notes are objects with id, content, and optional position
+        try {
+            const parsedNotes = savedNotes ? JSON.parse(savedNotes) : [];
+            return parsedNotes.map((n, index) => typeof n === 'string' ? {id: Date.now().toString() + index, content: n, position: {x: Math.random()*100, y: Math.random()*50}} : ({ ...n, id: n.id || Date.now().toString() + index }) );
+        } catch (e) {
+            return [];
+        }
     });
     const [showStickyNotes, setShowStickyNotes] = useState(false);
-    const [activeStickyNote, setActiveStickyNote] = useState(null);
+    const [activeStickyNoteId, setActiveStickyNoteId] = useState(null); // Store ID of active note
     const [showAddNotePopup, setShowAddNotePopup] = useState(false);
     const [weatherData, setWeatherData] = useState(null);
     const [weatherLocation, setWeatherLocation] = useState(() => localStorage.getItem('weatherLocation') || 'Warsaw');
@@ -96,10 +102,18 @@ function App() {
     const [showArticlePopup, setShowArticlePopup] = useState(false);
     const [articleContent, setArticleContent] = useState(null);
     const [articleTitle, setArticleTitle] = useState(null);
-    const [enableNews, setEnableNews] = useState(() => JSON.parse(localStorage.getItem('enableNews')) || false);
-    const [enableWeather, setEnableWeather] = useState(() => JSON.parse(localStorage.getItem('enableWeather')) || false);
+    const [enableNews, setEnableNews] = useState(() => JSON.parse(localStorage.getItem('enableNews') || 'false'));
+    const [enableWeather, setEnableWeather] = useState(() => JSON.parse(localStorage.getItem('enableWeather') || 'false'));
     const [showCalculator, setShowCalculator] = useState(false);
     const [showDevice, setShowDevice] = useState(false);
+    const [userRssFeeds, setUserRssFeeds] = useState(() => {
+        const savedUserFeeds = localStorage.getItem('userRssFeeds');
+        return savedUserFeeds ? JSON.parse(savedUserFeeds) : [];
+    });
+    const [newRssUrl, setNewRssUrl] = useState("");
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(null); // { index: number, note: object }
+    const [showToolsDropdown, setShowToolsDropdown] = useState(false);
+    const toolsDropdownRef = useRef(null);
 
 
     const Time = () => {
@@ -122,7 +136,7 @@ function App() {
     
     const fetchArticleContent = async (url) => {
         try {
-            const response = await fetch(`https://cors.ż.co/api/2?url=${url}`);
+            const response = await fetch(`https://cors.Å¼.co/api/2?url=${url}`);
             const data = await response.text();
             setArticleContent(data);
         } catch (error) {
@@ -160,53 +174,75 @@ function App() {
       
     const processXML = async (xml) => {
         try {
+            if (!xml || typeof xml !== 'string') {
+                console.error("Invalid XML content received for parsing.");
+                return [];
+            }
             const parser = new RSSParser();
             const feed = await parser.parseString(xml);
-            const articles = feed.items.slice(0, 5);
+            const articles = feed.items && Array.isArray(feed.items) ? feed.items.slice(0, 5) : [];
             return articles;
         } catch (error) {
+            console.error("Error parsing RSS XML:", error, xml.substring(0,100));
             return [];
         }
     };
     
     const fetchNews = async (url) => {
-        if  (newsRef.current) {
-        newsRef.current.postMessage({ mode: 'news', query: url });
-        return new Promise(resolve => {
-            const handleNewsMessage = (event) => {
-                if (event.data.mode === 'news') {
-                    newsRef.current.removeEventListener('message', handleNewsMessage);
-                    resolve(event.data.data);
-                }
-            };
-            newsRef.current.addEventListener('message', handleNewsMessage);
-        });
+        if (newsRef.current) {
+            newsRef.current.postMessage({ mode: 'news', query: url });
+            return new Promise(resolve => {
+                const handleNewsMessage = (event) => {
+                    if (event.data.mode === 'news' && (event.data.query === url || !event.data.query) ) { // Ensure message is for this URL or generic news
+                        newsRef.current.removeEventListener('message', handleNewsMessage);
+                        if (event.data.error) {
+                            console.error(`Error fetching news for ${url}: ${event.data.error}`);
+                            resolve(null); 
+                        } else {
+                            resolve(event.data.data);
+                        }
+                    }
+                };
+                newsRef.current.addEventListener('message', handleNewsMessage);
+            });
         } else {
-            return [];
+            console.error('News worker not initialized');
+            return Promise.resolve(null);
         }
     };
+
+    const allRssFeeds = () => {
+        const combined = [...new Set([...defaultRssFeeds, ...userRssFeeds])];
+        return combined;
+    };
+
     const fetchAndProcessNews = async () => {
         const newsList = [];
-        for (const url of rssFeeds) {
+        const feedsToFetch = allRssFeeds();
+        for (const url of feedsToFetch) {
             const xml = await fetchNews(url);
-            const articles = await processXML(xml);
-            newsList.push(...articles);
+            if (xml) {
+                const articles = await processXML(xml);
+                newsList.push(...articles);
+            } else {
+                console.warn(`Could not fetch or process news from ${url}`);
+            }
         }
-        setNews(newsList);
+        setNews(newsList.sort((a, b) => new Date(b.isoDate || b.pubDate || 0) - new Date(a.isoDate || a.pubDate || 0)).slice(0, 20)); // Show more, sorted
     };
 
     const renderNews = () => {
-        if (news.length === 0) {
+        if (news.length === 0 && enableNews) {
             fetchAndProcessNews();
         }
         
         return (
             <div className="flex flex-col  overflow-x-hidden mt-2">
                 <h2 className="align-left text-white text-2xl font-bold ml-4">News</h2>
-                <div className="overflow-x-auto items-center overflow-y-hidden h-full w-full sm:h-64 sm:w-full md:h-full md:w-full">
-                    <div className="news-grid flex flex-nowrap">
+                <div className="overflow-x-auto pb-4">
+                    <div className="flex flex-nowrap space-x-4 pl-4 pr-4">
                     {news.map((article, index) => (
-                        <div key={index} className="news-item bg-gray-800 p-4 rounded shadow-lg ml-4">
+                        <div key={index} className="news-item bg-gray-800 p-4 rounded shadow-lg flex-shrink-0 w-72 md:w-80">
                             <h3 
                                 className="text-white text-md font-bold hover:underline hover:cursor-pointer break-words md:break-normal overflow-scroll"
                                 onClick={(e) => {
@@ -219,6 +255,10 @@ function App() {
                             >
                                 {article.title}
                             </h3>
+                            <p className="text-xs text-gray-400 mt-2">
+                                {article.isoDate ? new Date(article.isoDate).toLocaleDateString() : (article.pubDate ? new Date(article.pubDate).toLocaleDateString() : '')}
+                                {article.creator ? ` - ${article.creator}` : ''}
+                            </p>
                         </div>
                     ))}
                     </div>
@@ -248,11 +288,13 @@ function App() {
             }
         };
         
+        // For news worker, it needs to return the query in message to distinguish
         newsRef.current.onmessage = (event) => {
             if (event.data.error) {
                 console.error(`News worker error: ${event.data.error}`);
             } else {
-                processXML(event.data.data);
+                // This generic onmessage for newsRef is problematic if multiple requests are out.
+                // The promise-based fetchNews handles its own messages.
             }
         };
     }, []);
@@ -294,6 +336,13 @@ function App() {
     }, [dropdown, suggestions]);
 
     useEffect(() => {
+        const handleClickOutsideTools = (event) => {
+            if (toolsDropdownRef.current && !toolsDropdownRef.current.contains(event.target)) setShowToolsDropdown(false);
+        };
+        if (showToolsDropdown) document.addEventListener("mousedown", handleClickOutsideTools);
+        return () => document.removeEventListener("mousedown", handleClickOutsideTools);
+    }, [showToolsDropdown]);
+    useEffect(() => {
         if (query.length > 2) {
             suggestionRef.current.postMessage({ mode: 'search', query });
         } else {
@@ -330,60 +379,77 @@ function App() {
     const handleLocationChange = (event) => {
         const location = event.target.value;
         setWeatherLocation(location);
-        localStorage.setItem('weatherLocation', location);
+        // localStorage.setItem('weatherLocation', location); // useEffect for weatherLocation handles this
         fetchWeatherData(location);
     };
 
     const toggleDropdown = (icon) => {
         setDropdown(dropdown === icon ? null : icon);
     };
+    
+    useEffect(() => {
+        localStorage.setItem('weatherLocation', weatherLocation);
+    }, [weatherLocation]);
 
-    const StickyNote = ({ note, onClose, onSave }) => {
-        const [editedNote, setEditedNote] = useState(note);
+    useEffect(() => {
+        localStorage.setItem('userRssFeeds', JSON.stringify(userRssFeeds));
+        if(enableNews) {
+            fetchAndProcessNews();
+        }
+    }, [userRssFeeds, enableNews]);
+
+    const StickyNote = ({ noteId, initialContent, onClose, onSave, initialPosition }) => {
+        const [content, setContent] = useState(initialContent);
         const [isEdited, setIsEdited] = useState(false);
+        const noteRef = useRef(null);
+        const contentEditableRef = useRef(null);
     
         const handleInput = (e) => {
             const newText = e.target.innerText;
-            setEditedNote(newText);
-            setIsEdited(newText !== note);
+            setContent(newText);
+            setIsEdited(newText !== initialContent);
         };
     
-        const handleEditStickyNote = () => {
-            const updatedNotes = stickyNotes.map((note, index) => 
-                note === activeStickyNote ? editedNote : note
+        const handleSave = () => {
+            onSave(noteId, content);
+            setIsEdited(false); 
+        };
+
+        useEffect(() => {
+            setContent(initialContent);
+            if (contentEditableRef.current) {
+                contentEditableRef.current.innerText = initialContent;
+            }
+            setIsEdited(false);
+        }, [initialContent, noteId]);
+
+        const handleNoteStop = (e, data) => {
+            const updatedNotes = stickyNotes.map(n => 
+                n.id === noteId ? { ...n, position: { x: data.x, y: data.y } } : n
             );
-            setStickyNotes(updatedNotes);
-            localStorage.setItem('stickyNotes', JSON.stringify(updatedNotes));
-            setActiveStickyNote(editedNote);
+            setStickyNotes(updatedNotes); // This will trigger localStorage update via useEffect for stickyNotes
         };
     
         return (
-            <Draggable cancel={".interactable"}>
-                <div className="sticky-note bg-gray-800 p-4 rounded shadow-lg relative w-64 cursor-move">
-                    <p className="text-white font-bold mb-2">Note</p>
-                    <button 
-                        className="interactable absolute top-1 right-2 text-white hover:text-gray-400"
-                        onClick={onClose}
-                    >
-                        <i className="fas fa-times"></i>
-                    </button>
-                    <p
+            <Draggable nodeRef={noteRef} cancel={".interactable"} defaultPosition={initialPosition} onStop={handleNoteStop}>
+                <div ref={noteRef} className="sticky-note bg-gray-800 p-4 rounded shadow-lg relative w-64 cursor-move">
+                    <div className="flex justify-between items-center mb-2">
+                        <p className="text-white font-bold">Note</p>
+                        <button className="interactable text-white hover:text-gray-400" onClick={() => onClose(noteId)}>
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div
+                        ref={contentEditableRef}
                         contentEditable={true}
                         onInput={handleInput}
-                        className="outline-none interactable"
+                        className="outline-none interactable text-white bg-gray-700 p-2 rounded min-h-[100px] whitespace-pre-wrap"
                         suppressContentEditableWarning={true}
-                    >
-                        {note.split('\n').map((line, index) => (
-                            <span key={index}>
-                                {line}
-                                <br />
-                            </span>
-                        ))}
-                    </p>
+                    />
                     {isEdited && (
                         <button
                             className="interactable bg-green-500 text-white px-4 py-2 rounded mt-2 w-full"
-                            onClick={handleEditStickyNote}
+                            onClick={handleSave}
                         >
                             Save
                         </button>
@@ -393,13 +459,12 @@ function App() {
         );
     };
 
-    const handleEditStickyNote = (updatedNote) => {
-        const updatedNotes = stickyNotes.map((note, index) => 
-            note === activeStickyNote ? updatedNote : note
+    const handleUpdateStickyNote = (noteId, newContent) => {
+        const updatedNotes = stickyNotes.map(note =>
+            note.id === noteId ? { ...note, content: newContent } : note
         );
         setStickyNotes(updatedNotes);
-        localStorage.setItem('stickyNotes', JSON.stringify(updatedNotes));
-        setActiveStickyNote(updatedNote);
+        // localStorage update is handled by useEffect on stickyNotes
     };
 
     
@@ -447,31 +512,43 @@ function App() {
         setShowAddNotePopup(true);
     };
     
-    const handleSaveStickyNote = (newNote) => {
-        if (newNote) {
+    const handleSaveStickyNote = (newNoteText) => {
+        if (newNoteText) {
+            const newNote = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9), // More unique ID
+                content: newNoteText.trim(),
+                position: { x: Math.random() * 150 + 50, y: Math.random() * 100 + 50 }
+            };
             const updatedNotes = [...stickyNotes, newNote];
             setStickyNotes(updatedNotes);
-            setActiveStickyNote(newNote);
-            localStorage.setItem('stickyNotes', JSON.stringify(updatedNotes));
+            setActiveStickyNoteId(newNote.id);
+            // localStorage update is handled by useEffect on stickyNotes
         }
     };
 
-    const handleCloseStickyNote = () => {
-        setActiveStickyNote(null);
+    useEffect(() => {
+        localStorage.setItem('stickyNotes', JSON.stringify(stickyNotes));
+    }, [stickyNotes]);
+
+    const handleCloseStickyNote = (noteId) => {
+        if (activeStickyNoteId === noteId || !noteId) {
+            setActiveStickyNoteId(null);
+        }
     };
 
-    const handleSetActiveStickyNote = (note) => {
-        setActiveStickyNote(note);
+    const handleSetActiveStickyNote = (noteObjOrId) => {
+        const noteIdToActivate = typeof noteObjOrId === 'string' ? noteObjOrId : noteObjOrId.id;
+        setActiveStickyNoteId(noteIdToActivate);
         setShowStickyNotes(false);
     };
 
     const handleViewStickyNotes = () => {
         setShowStickyNotes(!showStickyNotes);
     };
-    const handleDeleteStickyNote = (index) => {
-        const updatedNotes = stickyNotes.filter((_, i) => i !== index);
+    const handleDeleteStickyNote = (noteId) => {
+        if (activeStickyNoteId === noteId) setActiveStickyNoteId(null);
+        const updatedNotes = stickyNotes.filter(note => note.id !== noteId);
         setStickyNotes(updatedNotes);
-        localStorage.setItem('stickyNotes', JSON.stringify(updatedNotes));
     };
 
     const renderWeather = () => {
@@ -481,7 +558,7 @@ function App() {
         }
 
         const renderWeatherWidget = () => {
-            if (!weatherData || !weatherData.hourly || !weatherData.hourly.data) {
+            if (!weatherData || !weatherData.hourly || !weatherData.hourly.data || weatherData.hourly.data.length === 0) {
                 return <p>No hourly temperature data available.</p>;
             }
         
@@ -536,7 +613,7 @@ function App() {
                                                 <p className="text-white text-sm">{temperatureCelsius}°C</p>
                                             </div>
                                             <div className="ml-4">
-                                                <p className="text-white text-sm ml-1">🌦️</p>
+                                                <p className="text-white text-sm ml-1">🌬️</p>
                                                 <p className="text-white text-sm">{precipType}</p>
                                             </div>
                                             <div className="ml-4">
@@ -553,7 +630,7 @@ function App() {
                 </>
             );
         };
-        const location = weatherData ? weatherData.merry.location.name : 'Loading...';
+        const location = weatherData && weatherData.merry && weatherData.merry.location ? weatherData.merry.location.name : 'Loading...';
 
         return (
             renderWeatherWidget()
@@ -561,38 +638,45 @@ function App() {
     };
 
     const SetupPopup = () => {
-        const [defaultEngine, setDefaultEngine] = useState(searchEngines[0]);
-        const [currentTheme, setCurrentTheme] = useState(themes[0]);
-        const [enableNews, setEnableNews] = useState(false);
-        const [enableWeather, setEnableWeather] = useState(false);
-        const [weatherLocation, setWeatherLocation] = useState('');
+        const [localDefaultEngine, setLocalDefaultEngine] = useState(searchEngines[0]);
+        const [localCurrentThemeObj, setLocalCurrentThemeObj] = useState(themes[0]);
+        const [localEnableNews, setLocalEnableNews] = useState(false);
+        const [localEnableWeather, setLocalEnableWeather] = useState(false);
+        const [localWeatherLocation, setLocalWeatherLocation] = useState('');
         
         const handleSaveSetup = () => {
-            localStorage.setItem('searchEngine', JSON.stringify(defaultEngine));
-            
-            localStorage.setItem('theme', currentTheme.className);
-            localStorage.setItem('enableNews', JSON.stringify(enableNews));
-            localStorage.setItem('enableWeather', JSON.stringify(enableWeather));
-            if (enableWeather) {
-            localStorage.setItem('weatherLocation', weatherLocation);
+            setDefaultEngine(localDefaultEngine);
+            setCurrentTheme(localCurrentThemeObj.className);
+            setEnableNews(localEnableNews);
+            setEnableWeather(localEnableWeather);
+            if (localEnableWeather && localWeatherLocation) {
+                setWeatherLocation(localWeatherLocation);
             }
-            localStorage.setItem('isSetup', JSON.stringify(true));
+            // localStorage persistence is handled by useEffect hooks in App for these states
+            localStorage.setItem('isSetup', 'true');
             setIsSetup(true);
         };
         
         return (
             <div className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
                 <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
+                    <style>{`
+                        .toggle-switch { width: 37.5px; height: 18px; background-color: #ccc; border-radius: 50px; position: relative; cursor: pointer; transition: background-color 0.2s; }
+                        .toggle-thumb { width: 16px; height: 16px; background-color: white; border-radius: 50%; position: absolute; top: 1px; left: -1px; transition: transform 0.2s; }
+                        .toggle-thumb.on { transform: translateX(26px); }
+                        .toggle-switch.on { background-color: #4caf50; }
+                    `}</style>
+                    {/* Styles are duplicated here as they are in global styles.css. Better to ensure global styles apply or pass class names. */}
                     <div className="flex justify-between items-center mb-4">
                         <h1 className="text-white font-bold text-xl mb-4">Setup</h1>
                     </div>
                     <p className="text-white text-lg font-bold mb-2">Default Search Engine</p>
                     <select
                         className="bg-gray-700 text-center text-white px-4 py-2 rounded w-full"
-                        value={defaultEngine[2]}
+                        value={localDefaultEngine[2]}
                         onChange={(e) => {
                             const selectedEngine = searchEngines.find(engine => engine[2] === e.target.value);
-                            setDefaultEngine(selectedEngine);
+                            setLocalDefaultEngine(selectedEngine);
                             }}
                     >
                         {searchEngines.map((engine, index) => (
@@ -604,8 +688,8 @@ function App() {
                     <p className="text-white text-lg font-bold mt-4">Theme</p>
                     <select
                         className="bg-gray-700 text-center text-white px-4 py-2 rounded w-full"
-                        value={currentTheme.className}
-                        onChange={(e) => setCurrentTheme(themes.find(theme => theme.className === e.target.value))}
+                        value={localCurrentThemeObj.className}
+                        onChange={(e) => setLocalCurrentThemeObj(themes.find(theme => theme.className === e.target.value))}
                         >
                             {themes.map(theme => (
                                 <option key={theme.name} value={theme.className}>{theme.name}</option>
@@ -616,12 +700,12 @@ function App() {
                         <div className="relative">
                             <input 
                             type="checkbox" 
-                            checked={enableNews} 
-                            onChange={(e) => setEnableNews(e.target.checked)} 
+                            checked={localEnableNews} 
+                            onChange={(e) => setLocalEnableNews(e.target.checked)} 
                             className="hidden"
                             />
-                            <div className={`toggle-switch ${enableNews ? 'on' : 'off'}`} onClick={() => setEnableNews(!enableNews)}></div>
-                            <div className={`toggle-thumb ${enableNews ? 'on' : 'off'}`}></div>
+                            <div className={`toggle-switch ${localEnableNews ? 'on' : 'off'}`} onClick={() => setLocalEnableNews(!localEnableNews)}></div>
+                            <div className={`toggle-thumb ${localEnableNews ? 'on' : 'off'}`}></div>
 
                     </div>
                 </div>
@@ -630,23 +714,23 @@ function App() {
                         <div className="relative">
                             <input 
                             type="checkbox" 
-                            checked={enableWeather} 
-                            onChange={(e) => setEnableWeather(e.target.checked)} 
+                            checked={localEnableWeather} 
+                            onChange={(e) => setLocalEnableWeather(e.target.checked)} 
                             className="hidden"
                             />
-                            <div className={`toggle-switch ${enableWeather ? 'on' : 'off'}`} onClick={() => setEnableWeather(!enableWeather)}></div>
-                            <div className={`toggle-thumb ${enableWeather ? 'on' : 'off'}`}></div>
+                            <div className={`toggle-switch ${localEnableWeather ? 'on' : 'off'}`} onClick={() => setLocalEnableWeather(!localEnableWeather)}></div>
+                            <div className={`toggle-thumb ${localEnableWeather ? 'on' : 'off'}`}></div>
                         </div>
                     </div>
-                    {enableWeather && (
+                    {localEnableWeather && (
                         <div className="flex items-center space-x-4">
                             <p className="text-white font-bold">Location</p>
                             <input
                             type="text"
                             className="bg-gray-700 text-white px-4 py-2 rounded w-full"
                             placeholder="City, Region, Country"
-                            value={weatherLocation}
-                            onChange={(e) => setWeatherLocation(e.target.value)}
+                            value={localWeatherLocation}
+                            onChange={(e) => setLocalWeatherLocation(e.target.value)}
                             />
                         </div>
                     )}
@@ -742,31 +826,40 @@ function App() {
         useEffect(() => {
             const getDeviceInfo = async () => {
                 const deviceInfo = {};
-    
-                const ipResponse = await fetch('https://api.ipify.org?format=json');
-                const ipData = await ipResponse.json();
-                deviceInfo.ipAddress = ipData.ip;
+                try {
+                    const ipResponse = await fetch('https://api.ipify.org?format=json');
+                    if (ipResponse.ok) {
+                        const ipData = await ipResponse.json();
+                        deviceInfo.ipAddress = ipData.ip;
+                    } else {
+                        deviceInfo.ipAddress = "Could not fetch IP";
+                    }
+                } catch (e) {
+                    deviceInfo.ipAddress = "Error fetching IP";
+                }
     
                 deviceInfo.browser = navigator.userAgent;
                 deviceInfo.browserName = getBrowserName(navigator.userAgent);
                 deviceInfo.browserVersion = getBrowserVersion(navigator.userAgent);
-    
                 deviceInfo.deviceType = getDeviceType(navigator.userAgent);
-    
                 deviceInfo.deviceOS = getDeviceOS(navigator.userAgent);
                 deviceInfo.deviceOSVersion = getDeviceOSVersion(navigator.userAgent);
-    
                 deviceInfo.screenResolution = `${window.screen.width}x${window.screen.height}`;
-        
                 setDeviceInfo(deviceInfo);
             };
     
             getDeviceInfo();
         }, []);
     
+        // Helper functions need to be robust
         const getBrowserName = (userAgent) => {
+            if (!userAgent) return 'Unknown';
             if (userAgent.indexOf('Chrome') !== -1) return 'Chrome';
             if (userAgent.indexOf('Firefox') !== -1) return 'Firefox';
+            // Safari might also contain "Chrome" in userAgent on iOS. Order matters.
+            // More robust detection might be needed for accuracy.
+            if (userAgent.indexOf('Edg') !== -1) return 'Edge'; // Modern Edge
+            if (userAgent.indexOf('MSIE') !== -1 || userAgent.indexOf('Trident/') !== -1) return 'IE';
             if (userAgent.indexOf('Safari') !== -1) return 'Safari';
             if (userAgent.indexOf('Edge') !== -1) return 'Edge';
             if (userAgent.indexOf('Opera') !== -1) return 'Opera';
@@ -774,28 +867,43 @@ function App() {
         };
     
         const getBrowserVersion = (userAgent) => {
-            const versionRegex = /Version\/(\d+\.\d+\.\d+)/;
-            const match = userAgent.match(versionRegex);
-            return match && match[1] ? match[1] : 'Unknown';
+            if (!userAgent) return 'Unknown';
+            let match = userAgent.match(/(Chrome|Firefox|Safari|Edg|Opera|MSIE|Trident(?=\/))\/?\s*(\d+)/i) || [];
+            if (/trident/i.test(match[1])) { // IE 11
+                let rv = userAgent.match(/\brv[ :]+(\d+)/g) || [];
+                return (rv[1] || '').split(')')[0];
+            }
+            if (match[1] === 'Chrome') {
+                let temp = userAgent.match(/\b(OPR|Edg)\/(\d+)/);
+                if (temp != null) return temp.slice(1).join(' ').replace('OPR', 'Opera').replace('Edg', 'Edge');
+            }
+            match = match[2] ? [match[1], match[2]] : [navigator.appName, navigator.appVersion, '-?'];
+            let tem = userAgent.match(/version\/(\d+)/i);
+            if (tem != null) match.splice(1, 1, tem[1]);
+            return match.join(' ');
         };
     
         const getDeviceType = (userAgent) => {
-            if (userAgent.indexOf('Mobile') !== -1) return 'Mobile';
-            if (userAgent.indexOf('Tablet') !== -1) return 'Tablet';
+            if (!userAgent) return 'Desktop';
+            if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(userAgent)) return 'Tablet';
+            if (/Mobile|iP(hone|od)|Android|BlackBerry|IEMobile|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(userAgent)) return 'Mobile';
             return 'Desktop';
         };
     
         const getDeviceOS = (userAgent) => {
-            if (userAgent.indexOf('Windows') !== -1) return 'Windows';
-            if (userAgent.indexOf('Mac OS X') !== -1) return 'macOS';
-            if (userAgent.indexOf('Linux') !== -1) return 'Linux';
-            if (userAgent.indexOf('Android') !== -1) return 'Android';
-            if (userAgent.indexOf('iOS') !== -1) return 'iOS';
+            if (!userAgent) return 'Unknown';
+            if (/windows phone/i.test(userAgent)) return "Windows Phone";
+            if (/windows nt/i.test(userAgent)) return "Windows";
+            if (/android/i.test(userAgent)) return "Android";
+            if (/linux/i.test(userAgent)) return "Linux"; // Check before Android for Linux desktop
+            if (/iphone|ipad|ipod/i.test(userAgent)) return "iOS";
+            if (/macintosh|mac os x/i.test(userAgent)) return "macOS";
             return 'Unknown';
         };
     
-        const getDeviceOSVersion = (userAgent) => {
-            const versionRegex = /Android (\d+\.\d+)/;
+        const getDeviceOSVersion = (userAgent) => { // This is very basic
+            if (!userAgent) return 'Unknown';
+            const versionRegex = /(?:Windows NT |Android |CPU OS |Mac OS X |Linux )([^);]+)/;
             const match = userAgent.match(versionRegex);
             return match && match[1] ? match[1] : 'Unknown';
         };
@@ -803,7 +911,7 @@ function App() {
         return (
         <Draggable cancel={".interactable"}>
             <div className="fixed bottom-4 right-4 z-50 max-w-xs bg-gray-800 p-4 rounded-lg shadow-lg">
-                <h2>Device Information</h2>
+                <h2 className="text-white text-lg font-bold mb-2">Device Information</h2>
                 <i 
                         className="interactable fas fa-times text-white absolute top-2 right-2 cursor-pointer" 
                         onClick={handleDeviceClose}
@@ -819,6 +927,55 @@ function App() {
         </Draggable>
         );
     };
+
+    const handleExportSettings = () => {
+        const settingsToExport = {
+            version: 1.1, // Updated version
+            searchEngine: JSON.parse(localStorage.getItem('searchEngine') || JSON.stringify(searchEngines[0])),
+            theme: localStorage.getItem('theme') || 'Ocean',
+            enableNews: JSON.parse(localStorage.getItem('enableNews') || 'false'),
+            enableWeather: JSON.parse(localStorage.getItem('enableWeather') || 'false'),
+            weatherLocation: localStorage.getItem('weatherLocation') || 'Warsaw',
+            customLinks: JSON.parse(localStorage.getItem('customLinks') || JSON.stringify(iconLinks)),
+            stickyNotes: JSON.parse(localStorage.getItem('stickyNotes') || '[]'),
+            userRssFeeds: JSON.parse(localStorage.getItem('userRssFeeds') || '[]'),
+        };
+        const jsonString = JSON.stringify(settingsToExport, null, 2);
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `augur_settings_${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleImportSettings = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported && (imported.version === 1 || imported.version === 1.1)) {
+                        if(imported.searchEngine) setDefaultEngine(imported.searchEngine);
+                        if(imported.theme) setCurrentTheme(imported.theme);
+                        if(typeof imported.enableNews === 'boolean') setEnableNews(imported.enableNews);
+                        if(typeof imported.enableWeather === 'boolean') setEnableWeather(imported.enableWeather);
+                        if(imported.weatherLocation) setWeatherLocation(imported.weatherLocation);
+                        if(imported.customLinks) setCustomLinks(imported.customLinks);
+                        if(imported.stickyNotes) setStickyNotes(imported.stickyNotes.map((n,idx) => typeof n === 'string' ? {id: Date.now().toString()+idx, content: n} : ({...n, id: n.id || Date.now().toString()+idx})));
+                        if(imported.userRssFeeds) setUserRssFeeds(imported.userRssFeeds);
+                        alert("Settings imported successfully! Some changes may require a page refresh.");
+                    } else { alert("Invalid or incompatible settings file."); }
+                } catch (error) { alert("Error importing settings: " + error.message); }
+                event.target.value = null; // Reset file input
+            };
+            reader.readAsText(file);
+        }
+    };
     
     return (
         <div className="absolute w-full h-full bg-black">
@@ -831,15 +988,22 @@ function App() {
                     onClose={() => setShowAddNotePopup(false)}
                 />
             )}
-            {activeStickyNote && (
-                <div className="fixed top-4 right-4 z-50">
+            {activeStickyNoteId && (() => {
+                const currentActiveNote = stickyNotes.find(n => n.id === activeStickyNoteId);
+                if (!currentActiveNote) return null;
+                return (
+                // Position will be handled by Draggable's defaultPosition or saved position
+                // <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
                     <StickyNote 
-                        note={activeStickyNote} 
+                        key={currentActiveNote.id}
+                        noteId={currentActiveNote.id}
+                        initialContent={currentActiveNote.content}
+                        initialPosition={currentActiveNote.position}
                         onClose={handleCloseStickyNote}
-                        onEdit={handleEditStickyNote}
-                    />
-                </div>
-            )}
+                        onSave={handleUpdateStickyNote} />
+                // </div>
+                );
+            })()}
             {showCalculator && 
                 <div className="fixed top-4 right-4 z-50">
                     <Calculator 
@@ -860,34 +1024,62 @@ function App() {
                             </button>
                         </div>
                         {stickyNotes.length > 0 ? (
-                            stickyNotes.map((note, index) => {
-                                const formattedNote = note.split('\n').map((line, i) => (
-                                    <span key={i}>
-                                        {line}
-                                        <br />
-                                    </span>
-                                ));
-
+                            stickyNotes.map((note) => {
                                 return (
-                                    <div key={index} className="flex justify-between items-center mb-2 hover:bg-gray-700 p-2 rounded">
+                                    <div key={note.id} className="flex justify-between items-center mb-2 hover:bg-gray-700 p-2 rounded">
                                         <p 
-                                            className="text-white cursor-pointer flex-grow"
-                                            onClick={() => handleSetActiveStickyNote(note)}
+                                            className="text-white cursor-pointer flex-grow mr-2"
                                         >
-                                            {formattedNote}
+                                            {note.content.length > 50 ? note.content.substring(0, 50) + "..." : 
+                                                note.content.split('\n').map((line, i) => (<span key={i}>{line}<br /></span>))
+                                            }
                                         </p>
-                                        <button
-                                            className="bg-red-500 text-white px-2 py-1 rounded ml-2"
-                                            onClick={() => handleDeleteStickyNote(index)}
-                                        >
-                                            <i className="fas fa-trash"></i>
-                                        </button>
+                                        <div className="flex space-x-2">
+                                            <button
+                                                title="Edit Note"
+                                                className="bg-blue-500 text-white px-2 py-1 rounded"
+                                                onClick={() => handleSetActiveStickyNote(note.id)} >
+                                                <i className="fas fa-edit"></i>
+                                            </button>
+                                            <button
+                                                title="Delete Note"
+                                                className="bg-red-500 text-white px-2 py-1 rounded"
+                                                onClick={() => setShowDeleteConfirm({ id: note.id, content: note.content })} >
+                                                <i className="fas fa-trash"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 );
                             })
                         ) : (
                             <p className="text-white">No sticky notes found </p>
                         )}
+                    </div>
+                </div>
+            )}
+            {showDeleteConfirm && (
+                <div className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+                    <div className="bg-gray-800 p-6 rounded shadow-lg w-[90vw] max-w-[400px]">
+                        <h2 className="text-white text-xl mb-4">Confirm Deletion</h2>
+                        <p className="text-white mb-4">Are you sure you want to delete this note?</p>
+                        <p className="text-gray-400 bg-gray-700 p-2 rounded mb-4 max-h-32 overflow-y-auto whitespace-pre-wrap">
+                            {showDeleteConfirm.content}
+                        </p>
+                        <div className="flex justify-end space-x-2">
+                            <button
+                                className="bg-gray-600 text-white px-4 py-2 rounded"
+                                onClick={() => setShowDeleteConfirm(null)} >
+                                Cancel
+                            </button>
+                            <button
+                                className="bg-red-600 text-white px-4 py-2 rounded"
+                                onClick={() => {
+                                    handleDeleteStickyNote(showDeleteConfirm.id);
+                                    setShowDeleteConfirm(null);
+                                }} >
+                                Delete
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -976,38 +1168,59 @@ function App() {
             <div className="absolute bottom-0 left-0 right-0 flex justify-between items-center p-4 bg-black">
                 <div className="flex items-center space-x-4">
                     <i 
-                        className="fas fa-clipboard text-white text-2xl cursor-pointer" 
+                        className="fas fa-clipboard text-white text-2xl cursor-pointer"
                         onClick={handleViewStickyNotes}
+                        title="View All Notes"
                     ></i>
                     <i 
                         className="fas fa-sticky-note text-white text-2xl cursor-pointer relative" 
                         onClick={handleAddStickyNote}
+                        title="Add New Note"
                     ></i>
-                    <i 
-                        className="fas fa-tools text-white text-2xl cursor-pointer" 
-                        onClick={() => document.getElementById('tools').classList.toggle('hidden')}
-                    ></i>
+                    <div className="relative" ref={toolsDropdownRef}>
+                        <i 
+                            className="fas fa-tools text-white text-2xl cursor-pointer" 
+                            onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+                            title="Tools"
+                        ></i>
+                        {showToolsDropdown && (
+                            <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-700 p-3 rounded shadow-lg w-48 z-30"> {/* Increased width */}
+                                <ul className="space-y-2">
+                                    <li>
+                                        <button 
+                                            className="w-full text-left text-white hover:bg-gray-600 p-2 rounded flex items-center"
+                                            onClick={() => { setShowCalculator(true); setShowToolsDropdown(false); }}
+                                        >
+                                            <i className="fas fa-calculator mr-2 w-5 text-center"></i> Calculator
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button 
+                                            className="w-full text-left text-white hover:bg-gray-600 p-2 rounded flex items-center"
+                                            onClick={() => { setShowDevice(true); setShowToolsDropdown(false); }}
+                                        >
+                                            <i className="fas fa-laptop mr-2 w-5 text-center"></i> Device Info
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <div className="flex items-center space-x-4">
                     <button 
                         className="text-white px-4 py-2 rounded"
                         onClick={() => document.getElementById('settings').classList.toggle('hidden')}
+                        title="Settings"
                     >
                         <i className="fas fa-cog text-white text-2xl "></i>
                     </button>
                 </div>
             </div>
-            <div id="tools"className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
-                <div className="flex flex-col items-center justify-center h-screen">
-                    <p className="text-white text-2xl font-bold mb-4" onClick={() => document.getElementById('tools').classList.add('hidden')}>Tools</p>
-                    <i className="fas fa-calculator text-white text-2xl cursor-pointer relative" onClick={() => {setShowCalculator(true); }}></i>
-                    <i className="fas fa-laptop text-white text-2xl cursor-pointer relative" onClick={() => {setShowDevice(true); }}></i>
-                </div>
-            </div>
             <div id="settings" className="hidden absolute z-20 top-0 left-0 right-0 bottom-0 bg-black bg-opacity-75 flex justify-center items-center">
                 <div className="bg-gray-800 p-4 rounded w-[90vw] h-[80vh] max-w-[600px] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
-                        <h1 className="text-white font-bold text-xl mb-4">Settings <i className="fas fa-info-circle text-white" onClick={() => document.getElementById('about').classList.toggle('hidden')}></i></h1> 
+                        <h1 className="text-white font-bold text-xl mb-4">Settings <i className="fas fa-info-circle text-white cursor-pointer" title="About Augur" onClick={() => document.getElementById('about').classList.toggle('hidden')}></i></h1> 
                         <button
                             className="text-white mr-2 mb-4 hover:text-gray-400"
                             onClick={() => document.getElementById('settings').classList.add('hidden')}
@@ -1149,6 +1362,52 @@ function App() {
                             Save Custom Links
                         </button>
                     </div>
+                    <h2 className="text-white text-lg font-bold mt-4">RSS Feeds</h2>
+                    <div id="rssFeedSettings">
+                        {userRssFeeds.map((feedUrl, index) => (
+                            <div key={index} className="flex items-center space-x-2 mb-2">
+                                <input
+                                    type="text"
+                                    value={feedUrl}
+                                    readOnly
+                                    className="bg-gray-700 text-white px-2 py-1 rounded w-full sm:py-2"
+                                />
+                                <button
+                                    onClick={() => {
+                                        const updatedFeeds = userRssFeeds.filter((_, i) => i !== index);
+                                        setUserRssFeeds(updatedFeeds);
+                                    }}
+                                    className="bg-red-500 text-white px-4 py-2 rounded sm:px-6 sm:py-3" >
+                                    Remove
+                                </button>
+                            </div>
+                        ))}
+                        <div className="flex items-center space-x-2 mb-2">
+                            <input
+                                type="url"
+                                placeholder="Add new RSS feed URL"
+                                value={newRssUrl}
+                                onChange={(e) => setNewRssUrl(e.target.value)}
+                                className="bg-gray-700 text-white px-2 py-1 rounded w-full sm:py-2"
+                            />
+                            <button
+                                onClick={() => {
+                                    if (newRssUrl.trim() && !userRssFeeds.includes(newRssUrl.trim())) {
+                                        try { new URL(newRssUrl.trim()); setUserRssFeeds([...userRssFeeds, newRssUrl.trim()]); setNewRssUrl(""); }
+                                        catch (e) { alert("Invalid URL format for RSS feed."); }
+                                    } else if (userRssFeeds.includes(newRssUrl.trim())) { alert("This RSS feed is already in your list.");}
+                                }}
+                                className="bg-green-500 text-white px-4 py-2 rounded sm:py-3" >
+                                Add Feed
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Default feeds ({defaultRssFeeds.length}) will always be included. Add your custom feeds here.</p>
+                    </div>
+                    <h2 className="text-white text-lg font-bold mt-4">Data Management</h2>
+                    <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 mt-2">
+                        <button onClick={handleExportSettings} className="bg-blue-500 text-white px-4 py-2 rounded w-full">Export Settings</button>
+                        <label className="bg-green-500 text-white px-4 py-2 rounded w-full text-center cursor-pointer">Import Settings<input type="file" accept=".json" className="hidden" onChange={handleImportSettings}/></label>
+                    </div>
                     <button
                         className="mt-4 bg-red-500 text-white px-4 py-2 rounded w-full"
                         onClick={() => document.getElementById('settings').classList.add('hidden')}
@@ -1171,7 +1430,7 @@ function App() {
                     <p className="text-lg">Welcome to Augur.</p>
                     <p className="text-lg">Augur is a sweet and simple startpage with many features and customizations.</p>
                     <div className="flex flex-col space-y-2 mt-4">
-                        <a href="https://ż.co/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><i className="fas fa-code mr-2"></i>ż.co</a>
+                        <a href="https://Å¼.co/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><i className="fas fa-code mr-2"></i>Å¼.co</a>
                         <a href="https://github.com/9-5/Augur" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><i className="fab fa-github mr-2"></i> GitHub Repo</a>
                         <a href="https://johnle.org/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><i className="fas fa-user mr-2"></i> Developer Site</a>
                     </div>
